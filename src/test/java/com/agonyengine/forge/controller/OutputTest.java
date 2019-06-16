@@ -36,6 +36,17 @@ public class OutputTest {
     }
 
     @Test
+    public void testAppendOutputsConstructor() {
+        Output output = new Output("One");
+        Output append1 = new Output("Two");
+        Output append2 = new Output("Three");
+
+        Output result = new Output(output, append1, append2);
+
+        assertEquals(Arrays.asList("One", "Two", "Three"), result.getOutput());
+    }
+
+    @Test
     public void testAppendChaining() {
         Output output = new Output();
 

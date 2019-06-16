@@ -21,6 +21,10 @@ public class Output {
         append(output);
     }
 
+    public Output(Output ... outputs) {
+        append(outputs);
+    }
+
     public Output append(String ... output) {
         lines.addAll(Arrays.asList(output));
 
@@ -29,6 +33,12 @@ public class Output {
 
     public Output append(Collection<String> output) {
         lines.addAll(output);
+
+        return this;
+    }
+
+    public Output append(Output ... outputs) {
+        Arrays.stream(outputs).forEach(output -> this.lines.addAll(output.lines));
 
         return this;
     }

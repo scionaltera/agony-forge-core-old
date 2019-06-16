@@ -1,5 +1,6 @@
 package com.agonyengine.forge.config;
 
+import com.agonyengine.forge.controller.RemoteIpHandshakeInterceptor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.messaging.simp.config.StompBrokerRelayRegistration;
@@ -12,6 +13,7 @@ import org.springframework.session.Session;
 import org.springframework.session.web.socket.config.annotation.AbstractSessionWebSocketMessageBrokerConfigurer;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
+import org.springframework.web.socket.server.support.HttpSessionHandshakeInterceptor;
 
 import javax.inject.Inject;
 
@@ -27,10 +29,14 @@ public class WebSocketBrokerConfiguration extends AbstractSessionWebSocketMessag
 
     @Override
     protected void configureStompEndpoints(StompEndpointRegistry registry) {
+        HttpSessionHandshakeInterceptor httpSessionHandshakeInterceptor = new HttpSessionHandshakeInterceptor();
+
+        httpSessionHandshakeInterceptor.setCreateSession(true);
         registry
             .addEndpoint("/mud")
             .setHandshakeHandler(new UniqueHandshakeHandler())
             .withSockJS()
+            .setInterceptors(httpSessionHandshakeInterceptor, new RemoteIpHandshakeInterceptor())
             .setSupressCors(true);
     }
 

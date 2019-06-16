@@ -2,23 +2,14 @@ package com.agonyengine.forge.controller;
 
 import org.junit.Before;
 import org.junit.Test;
-import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
-
-import javax.servlet.http.HttpSession;
 
 import static org.junit.Assert.assertEquals;
 
 public class PublicControllerTest {
-    @Mock
-    private HttpSession httpSession;
-
     private PublicController controller;
 
     @Before
     public void setUp() {
-        MockitoAnnotations.initMocks(this);
-
         controller = new PublicController();
     }
 
@@ -29,6 +20,6 @@ public class PublicControllerTest {
 
     @Test
     public void testPlayController() {
-        assertEquals("play", controller.play(httpSession));
+        assertEquals("play", controller.play());
     }
 }
