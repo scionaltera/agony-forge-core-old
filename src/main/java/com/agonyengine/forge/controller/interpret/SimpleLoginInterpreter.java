@@ -103,7 +103,7 @@ public class SimpleLoginInterpreter implements Interpreter {
                     output.append("[red]Weird...");
                 }
 
-                output.append("[default]Welcome, " + name + "!", "");
+                output.append("[default]Welcome, " + name + "!");
                 attributes.put(CURRENT_STATE_KEY, InterpreterState.LOGGED_IN);
                 break;
             case LOGGED_IN:
@@ -126,9 +126,9 @@ public class SimpleLoginInterpreter implements Interpreter {
             case ASK_NAME:
                 return new Output("[default]What is your name?");
             case ASK_PASSWORD:
-                return new Output("[default]Password: ");
+                return new Output("[default]Password: ").setSecret(true);
             case CHOOSE_PASSWORD:
-                return new Output("[default]Please choose a password: ");
+                return new Output("[default]Please choose a password: ").setSecret(true);
             case LOGGED_IN:
                 return new Output(String.format("[default]%s> ", name));
             default:

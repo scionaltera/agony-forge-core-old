@@ -20,6 +20,9 @@
         <form id="user-input-form">
             <input type="text" id="user-input" autocomplete="off" autofocus/>
         </form>
+        <form id="user-password-form">
+            <input type="password" id="user-password" class="d-none"/>
+        </form>
     </div>
 </div>
 

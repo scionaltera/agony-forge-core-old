@@ -8,6 +8,7 @@ import java.util.Objects;
 
 public class Output {
     private List<String> lines = new ArrayList<>();
+    private boolean isSecret = false;
 
     public Output() {
         // this method intentionally left blank
@@ -40,11 +41,23 @@ public class Output {
     public Output append(Output ... outputs) {
         Arrays.stream(outputs).forEach(output -> this.lines.addAll(output.lines));
 
+        setSecret(Arrays.stream(outputs).anyMatch(Output::getSecret));
+
+        return this;
+    }
+
+    public Output setSecret(boolean isSecret) {
+        this.isSecret = isSecret;
+
         return this;
     }
 
     public List<String> getOutput() {
         return toList();
+    }
+
+    public boolean getSecret() {
+        return isSecret;
     }
 
     public List<String> toList() {

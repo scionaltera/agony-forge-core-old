@@ -7,6 +7,7 @@ import java.util.Collections;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 public class OutputTest {
     @Test
@@ -84,6 +85,23 @@ public class OutputTest {
 
         assertEquals(Arrays.asList("Output!", "Now!"), output.getOutput());
         assertEquals("Output!\nNow!", output.toString());
+    }
+
+    @Test
+    public void testSecret() {
+        Output output = new Output().setSecret(true);
+
+        assertTrue(output.getSecret());
+    }
+
+    @Test
+    public void testAppendSecret() {
+        Output output = new Output();
+        Output secret = new Output().setSecret(true);
+
+        output.append(secret);
+
+        assertTrue(output.getSecret());
     }
 
     @Test

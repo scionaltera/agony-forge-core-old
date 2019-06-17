@@ -8,7 +8,7 @@ var commandHistoryLength = 50;
 var scrollBackLength = 500;
 
 $(document).ready(function () {
-    $("#user-input-form").submit(function (event) {
+    $("form").submit(function (event) {
         sendInput();
         event.preventDefault();
         return false;
@@ -18,7 +18,7 @@ $(document).ready(function () {
 });
 
 $(document).keydown(function (event) {
-    if ("" === $("#user-input").val()) {
+    if ("" === $("form input:not(.d-none)").val()) {
         return true;
     }
 
@@ -39,7 +39,7 @@ $(document).keyup(function (event) {
         }
 
         if (commandHistoryIndex >= 0) {
-            $("#user-input").val(commandHistory[commandHistoryIndex]);
+            $("form input:not(.d-none)").val(commandHistory[commandHistoryIndex]);
         }
     } else if (event.which === 40) { // down arrow
         commandHistoryIndex--;
@@ -49,9 +49,9 @@ $(document).keyup(function (event) {
         }
 
         if (commandHistoryIndex >= 0) {
-            $("#user-input").val(commandHistory[commandHistoryIndex]);
+            $("form input:not(.d-none)").val(commandHistory[commandHistoryIndex]);
         } else {
-            $("#user-input").val("");
+            $("form input:not(.d-none)").val("");
         }
     }
 });
@@ -69,6 +69,19 @@ function connect() {
 
             stompClient.subscribe('/user/queue/output', function (message) {
                     var msg = JSON.parse(message.body);
+                    var plainInput = $("#user-input");
+                    var passwordInput = $("#user-password");
+
+                    if (msg.secret) {
+                        plainInput.addClass("d-none");
+                        passwordInput.removeClass("d-none");
+                        passwordInput.focus();
+                    } else {
+                        passwordInput.addClass("d-none");
+                        plainInput.removeClass("d-none");
+                        plainInput.focus();
+                    }
+
                     showOutput(msg.output);
                 },
                 {});
@@ -96,16 +109,20 @@ function connect() {
 }
 
 function sendInput() {
-    var inputBox = $("#user-input");
+    var inputBox = $("form input:not(.d-none)");
 
-    commandHistoryIndex = -1;
-    commandHistory.unshift(inputBox.val());
+    if (inputBox[0].type === 'text') {
+        commandHistoryIndex = -1;
+        commandHistory.unshift(inputBox.val());
 
-    if (commandHistory.length > commandHistoryLength) {
-        commandHistory.pop();
+        if (commandHistory.length > commandHistoryLength) {
+            commandHistory.pop();
+        }
+
+        $("#output-list").find("li:last-child").append("<span class='yellow'> " + htmlEscape(inputBox.val()) + "</span>");
+    } else {
+        $("#output-list").find("li:last-child").append("<span class='yellow'> ********</span>");
     }
-
-    $("#output-list").find("li:last-child").append("<span class='yellow'> " + htmlEscape(inputBox.val()) + "</span>");
 
     stompClient.send("/app/input", JSON.stringify({'input': inputBox.val()}));
     inputBox.val('');
