@@ -1,12 +1,14 @@
 package com.agonyengine.forge.controller;
 
+import org.springframework.web.util.HtmlUtils;
+
 import java.util.Objects;
 
 public class Input {
     private String input;
 
     public void setInput(String input) {
-        this.input = input;
+        this.input = HtmlUtils.htmlEscape(input);
     }
 
     public String getInput() {

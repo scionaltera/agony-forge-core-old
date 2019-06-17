@@ -7,6 +7,7 @@ import java.util.Collections;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 public class OutputTest {
     @Test
@@ -33,6 +34,17 @@ public class OutputTest {
 
         assertEquals(expected, full.toList());
         assertEquals("one\ntwo\nthree", full.toString());
+    }
+
+    @Test
+    public void testAppendOutputsConstructor() {
+        Output output = new Output("One");
+        Output append1 = new Output("Two");
+        Output append2 = new Output("Three");
+
+        Output result = new Output(output, append1, append2);
+
+        assertEquals(Arrays.asList("One", "Two", "Three"), result.getOutput());
     }
 
     @Test
@@ -73,6 +85,23 @@ public class OutputTest {
 
         assertEquals(Arrays.asList("Output!", "Now!"), output.getOutput());
         assertEquals("Output!\nNow!", output.toString());
+    }
+
+    @Test
+    public void testSecret() {
+        Output output = new Output().setSecret(true);
+
+        assertTrue(output.getSecret());
+    }
+
+    @Test
+    public void testAppendSecret() {
+        Output output = new Output();
+        Output secret = new Output().setSecret(true);
+
+        output.append(secret);
+
+        assertTrue(output.getSecret());
     }
 
     @Test

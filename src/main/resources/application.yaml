@@ -4,5 +4,18 @@ spring:
       hibernate:
         jdbc:
           lob:
-            non_contextual_creation: true
-    open-in-view: false
+            non_contextual_creation: true # Hides a warning on startup.
+    open-in-view: false # Hides a warning on startup.
+
+logging:
+  level:
+    org:
+      springframework:
+        session:
+          web:
+            socket:
+              handler:
+                # This class writes a stack trace at the ERROR level when new websocket connections are established
+                # but no HTTP session exists. It's not a fatal error because the session gets created and everything
+                # still works out. It's the only log message in the class, so let's turn it off.
+                WebSocketConnectHandlerDecoratorFactory: OFF
