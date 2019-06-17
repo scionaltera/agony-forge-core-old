@@ -29,7 +29,7 @@ public class WebSocketController {
     @Inject
     public WebSocketController(
         @Named("compositeGreetingLoader") GreetingLoader greetingLoader,
-        @Named("simpleLoginInterpreter") Interpreter interpreter) {
+        @Named("defaultLoginInterpreter") Interpreter interpreter) {
 
         greeting = greetingLoader.load();
         this.interpreter = interpreter;

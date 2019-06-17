@@ -52,12 +52,12 @@ public class Output {
         return this;
     }
 
-    public List<String> getOutput() {
-        return toList();
-    }
-
     public boolean getSecret() {
         return isSecret;
+    }
+
+    public List<String> getOutput() {
+        return toList();
     }
 
     public List<String> toList() {
