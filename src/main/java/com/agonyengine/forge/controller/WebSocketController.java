@@ -14,10 +14,11 @@ import org.springframework.stereotype.Controller;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.transaction.Transactional;
+import java.security.Principal;
 import java.util.List;
 import java.util.Map;
 
-import static com.agonyengine.forge.controller.ControllerConstants.AGONY_REMOTE_IP_KEY;
+import static com.agonyengine.forge.controller.ControllerConstants.*;
 
 @Controller
 public class WebSocketController {
@@ -37,9 +38,14 @@ public class WebSocketController {
 
     @Transactional
     @SubscribeMapping("/queue/output")
-    public Output onSubscribe(Message<byte[]> message) {
+    public Output onSubscribe(Principal principal, Message <byte[]> message) {
         SimpMessageHeaderAccessor headerAccessor = SimpMessageHeaderAccessor.wrap(message);
         Map<String, Object> attributes = headerAccessor.getSessionAttributes();
+
+        if (attributes != null) {
+            attributes.put(AGONY_STOMP_PRINCIPAL_KEY, principal.getName());
+            attributes.put(AGONY_STOMP_SESSION_KEY, headerAccessor.getSessionId());
+        }
 
         LOGGER.info("New connection from {}", attributes == null ? "(unknown)" : attributes.get(AGONY_REMOTE_IP_KEY));
 

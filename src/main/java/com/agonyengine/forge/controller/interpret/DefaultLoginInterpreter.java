@@ -2,6 +2,10 @@ package com.agonyengine.forge.controller.interpret;
 
 import com.agonyengine.forge.controller.Input;
 import com.agonyengine.forge.controller.Output;
+import com.agonyengine.forge.model.Connection;
+import com.agonyengine.forge.model.Creature;
+import com.agonyengine.forge.repository.CreatureRepository;
+import com.agonyengine.forge.service.CommService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -20,10 +24,13 @@ import org.springframework.session.SessionRepository;
 import org.springframework.stereotype.Component;
 
 import javax.inject.Inject;
+import javax.transaction.Transactional;
 import java.util.Collections;
 import java.util.Map;
+import java.util.UUID;
 
-import static com.agonyengine.forge.controller.ControllerConstants.AGONY_REMOTE_IP_KEY;
+import static com.agonyengine.forge.controller.ControllerConstants.*;
+import static com.agonyengine.forge.controller.ControllerConstants.AGONY_STOMP_SESSION_KEY;
 import static org.springframework.security.web.context.HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY;
 import static org.springframework.web.socket.server.support.HttpSessionHandshakeInterceptor.HTTP_SESSION_ID_ATTR_NAME;
 
@@ -49,18 +56,25 @@ public class DefaultLoginInterpreter implements Interpreter {
     private AuthenticationManager authenticationManager;
     private PasswordEncoder passwordEncoder;
     private SessionRepository sessionRepository;
+    private CreatureRepository creatureRepository;
+    private CommService commService;
 
     @Inject
     public DefaultLoginInterpreter(@SuppressWarnings("SpringJavaInjectionPointsAutowiringInspection") UserDetailsManager userDetailsManager,
                                    AuthenticationManager authenticationManager,
-                                   SessionRepository sessionRepository) {
+                                   SessionRepository sessionRepository,
+                                   CreatureRepository creatureRepository,
+                                   CommService commService) {
 
         this.userDetailsManager = userDetailsManager;
         this.authenticationManager = authenticationManager;
         this.passwordEncoder = PasswordEncoderFactories.createDelegatingPasswordEncoder();
         this.sessionRepository = sessionRepository;
+        this.creatureRepository = creatureRepository;
+        this.commService = commService;
     }
 
+    @Transactional
     @Override
     public Output interpret(Input input, Map<String, Object> attributes) {
         Output output = new Output();
@@ -89,7 +103,13 @@ public class DefaultLoginInterpreter implements Interpreter {
             case LOGIN_ASK_PASSWORD:
                 try {
                     logUserIn(name, validatePassword(input.toString()), attributes);
+
+                    Creature creature = buildPlayerCreature(name, attributes);
+                    Creature savedCreature = creatureRepository.save(creature);
+
+                    attributes.put(AGONY_CREATURE_KEY, savedCreature.getId());
                     attributes.put(CURRENT_STATE_KEY, InterpreterState.LOGGED_IN);
+
                     output.append("[yellow]Welcome, " + name + "!");
 
                     LOGGER.info("Successful login for {} from {}", name, attributes.get(AGONY_REMOTE_IP_KEY));
@@ -149,7 +169,13 @@ public class DefaultLoginInterpreter implements Interpreter {
             case CREATE_CONFIRM_PASSWORD:
                 try {
                     logUserIn(name, validatePassword(input.toString()), attributes);
+
+                    Creature creature = buildPlayerCreature(name, attributes);
+                    Creature savedCreature = creatureRepository.save(creature);
+
+                    attributes.put(AGONY_CREATURE_KEY, savedCreature.getId());
                     attributes.put(CURRENT_STATE_KEY, InterpreterState.LOGGED_IN);
+
                     output.append("[yellow]Welcome, " + name + "!");
 
                     LOGGER.info("New player {} from {}", name, attributes.get(AGONY_REMOTE_IP_KEY));
@@ -157,11 +183,18 @@ public class DefaultLoginInterpreter implements Interpreter {
                     output.append("[red]" + e.getMessage());
                 } catch (BadCredentialsException e) {
                     output.append("[red]Passwords do not match. Please try again!");
+                    userDetailsManager.deleteUser(name);
                     attributes.put(CURRENT_STATE_KEY, InterpreterState.CREATE_CHOOSE_PASSWORD);
                 }
                 break;
             case LOGGED_IN:
-                output.append("[cyan]" + input.toString(), "");
+                Creature creature = creatureRepository.findById((UUID)attributes.get(AGONY_CREATURE_KEY)).orElse(null);
+
+                output.append("[green]You gossip '" + input.toString() + "[green]'", "");
+                commService.echoToWorld(
+                    new Output("[green]" + name + " gossips '" + input.toString() + "[green]'", "")
+                        .append(prompt(attributes)), // TODO this needs be the target's prompt, not ours!
+                    creature);
                 break;
             default:
                 output.append("[red]Oops! Something went wrong. The error has been logged.", "");
@@ -171,6 +204,7 @@ public class DefaultLoginInterpreter implements Interpreter {
         return output.append(prompt(attributes));
     }
 
+    @Transactional
     @Override
     public Output prompt(Map<String, Object> attributes) {
         InterpreterState currentState = (InterpreterState)attributes.getOrDefault(CURRENT_STATE_KEY, InterpreterState.ASK_NEW);
@@ -246,5 +280,20 @@ public class DefaultLoginInterpreter implements Interpreter {
         session.setAttribute(SPRING_SECURITY_CONTEXT_KEY, securityContext);
 
         sessionRepository.save(session);
+    }
+
+    private Creature buildPlayerCreature(String name, Map<String, Object> attributes) {
+        User user = (User)userDetailsManager.loadUserByUsername(name);
+        Creature creature = new Creature();
+        Connection connection = new Connection();
+
+        connection.setSessionUsername((String)attributes.get(AGONY_STOMP_PRINCIPAL_KEY));
+        connection.setSessionId((String)attributes.get(AGONY_STOMP_SESSION_KEY));
+        connection.setRemoteAddress((String)attributes.get(AGONY_REMOTE_IP_KEY));
+
+        creature.setName(user.getUsername());
+        creature.setConnection(connection);
+
+        return creature;
     }
 }
