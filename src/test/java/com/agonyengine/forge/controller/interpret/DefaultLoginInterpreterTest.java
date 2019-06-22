@@ -125,7 +125,7 @@ public class DefaultLoginInterpreterTest {
 
         assertEquals("[default]Password: ", result.toString());
         assertTrue(result.getSecret());
-        assertEquals("Dan", connection.getScratch());
+        assertEquals("Dan", connection.getName());
         assertEquals(ConnectionState.LOGIN_ASK_PASSWORD, connection.getState());
     }
 
@@ -141,7 +141,7 @@ public class DefaultLoginInterpreterTest {
 
         assertEquals("[default]Password: ", result.toString());
         assertTrue(result.getSecret());
-        assertEquals("Danidanidanidanidanidanidanida", connection.getScratch());
+        assertEquals("Danidanidanidanidanidanidanida", connection.getName());
         assertEquals(ConnectionState.LOGIN_ASK_PASSWORD, connection.getState());
     }
 
@@ -157,7 +157,7 @@ public class DefaultLoginInterpreterTest {
 
         assertEquals("[red]Names may not contain whitespace.\n[default]Name: ", result.toString());
         assertFalse(result.getSecret());
-        assertNull(connection.getScratch());
+        assertNull(connection.getName());
         assertEquals(ConnectionState.LOGIN_ASK_NAME, connection.getState());
     }
 
@@ -173,7 +173,7 @@ public class DefaultLoginInterpreterTest {
 
         assertEquals("[red]Names may only contain letters.\n[default]Name: ", result.toString());
         assertFalse(result.getSecret());
-        assertNull(connection.getScratch());
+        assertNull(connection.getName());
         assertEquals(ConnectionState.LOGIN_ASK_NAME, connection.getState());
     }
 
@@ -189,7 +189,7 @@ public class DefaultLoginInterpreterTest {
 
         assertEquals("[red]Names must be at least 3 letters long.\n[default]Name: ", result.toString());
         assertFalse(result.getSecret());
-        assertNull(connection.getScratch());
+        assertNull(connection.getName());
         assertEquals(ConnectionState.LOGIN_ASK_NAME, connection.getState());
     }
 
@@ -205,7 +205,7 @@ public class DefaultLoginInterpreterTest {
 
         assertEquals("[red]Names may not be longer than 30 letters.\n[default]Name: ", result.toString());
         assertFalse(result.getSecret());
-        assertNull(connection.getScratch());
+        assertNull(connection.getName());
         assertEquals(ConnectionState.LOGIN_ASK_NAME, connection.getState());
     }
 
@@ -221,7 +221,7 @@ public class DefaultLoginInterpreterTest {
 
         assertEquals("[red]Names must begin with an upper case letter.\n[default]Name: ", result.toString());
         assertFalse(result.getSecret());
-        assertNull(connection.getScratch());
+        assertNull(connection.getName());
         assertEquals(ConnectionState.LOGIN_ASK_NAME, connection.getState());
     }
 
@@ -237,7 +237,7 @@ public class DefaultLoginInterpreterTest {
 
         assertEquals("[red]Names must not contain upper case letters other than the first.\n[default]Name: ", result.toString());
         assertFalse(result.getSecret());
-        assertNull(connection.getScratch());
+        assertNull(connection.getName());
         assertEquals(ConnectionState.LOGIN_ASK_NAME, connection.getState());
     }
 
@@ -248,7 +248,7 @@ public class DefaultLoginInterpreterTest {
         Connection connection = new Connection();
 
         input.setInput("Not!A_Real123Password");
-        connection.setScratch("Dani");
+        connection.setName("Dani");
         connection.setState(ConnectionState.LOGIN_ASK_PASSWORD);
         connection.setHttpSessionId(UUID.randomUUID().toString());
 
@@ -284,7 +284,7 @@ public class DefaultLoginInterpreterTest {
         Connection connection = new Connection();
 
         input.setInput("password");
-        connection.setScratch("Dani");
+        connection.setName("Dani");
         connection.setState(ConnectionState.LOGIN_ASK_PASSWORD);
         connection.setHttpSessionId(UUID.randomUUID().toString());
 
@@ -305,7 +305,7 @@ public class DefaultLoginInterpreterTest {
         Connection connection = new Connection();
 
         input.setInput("Not!A_R");
-        connection.setScratch("Dani");
+        connection.setName("Dani");
         connection.setState(ConnectionState.LOGIN_ASK_PASSWORD);
         connection.setHttpSessionId(UUID.randomUUID().toString());
 
@@ -346,7 +346,7 @@ public class DefaultLoginInterpreterTest {
 
         assertEquals("[default]Are you sure 'Dan' is the name you want? [y/N]: ", result.toString());
         assertFalse(result.getSecret());
-        assertEquals("Dan", connection.getScratch());
+        assertEquals("Dan", connection.getName());
         assertEquals(ConnectionState.CREATE_CONFIRM_NAME, connection.getState());
     }
 
@@ -362,7 +362,7 @@ public class DefaultLoginInterpreterTest {
 
         assertEquals("[default]Are you sure 'Danidanidanidanidanidanidanida' is the name you want? [y/N]: ", result.toString());
         assertFalse(result.getSecret());
-        assertEquals("Danidanidanidanidanidanidanida", connection.getScratch());
+        assertEquals("Danidanidanidanidanidanidanida", connection.getName());
         assertEquals(ConnectionState.CREATE_CONFIRM_NAME, connection.getState());
     }
 
@@ -378,7 +378,7 @@ public class DefaultLoginInterpreterTest {
 
         assertEquals("[red]Names may not contain whitespace.\n[default]Please choose a name: ", result.toString());
         assertFalse(result.getSecret());
-        assertNull(connection.getScratch());
+        assertNull(connection.getName());
         assertEquals(ConnectionState.CREATE_CHOOSE_NAME, connection.getState());
     }
 
@@ -394,7 +394,7 @@ public class DefaultLoginInterpreterTest {
 
         assertEquals("[red]Names may only contain letters.\n[default]Please choose a name: ", result.toString());
         assertFalse(result.getSecret());
-        assertNull(connection.getScratch());
+        assertNull(connection.getName());
         assertEquals(ConnectionState.CREATE_CHOOSE_NAME, connection.getState());
     }
 
@@ -410,7 +410,7 @@ public class DefaultLoginInterpreterTest {
 
         assertEquals("[red]Names must be at least 3 letters long.\n[default]Please choose a name: ", result.toString());
         assertFalse(result.getSecret());
-        assertNull(connection.getScratch());
+        assertNull(connection.getName());
         assertEquals(ConnectionState.CREATE_CHOOSE_NAME, connection.getState());
     }
 
@@ -426,7 +426,7 @@ public class DefaultLoginInterpreterTest {
 
         assertEquals("[red]Names may not be longer than 30 letters.\n[default]Please choose a name: ", result.toString());
         assertFalse(result.getSecret());
-        assertNull(connection.getScratch());
+        assertNull(connection.getName());
         assertEquals(ConnectionState.CREATE_CHOOSE_NAME, connection.getState());
     }
 
@@ -442,7 +442,7 @@ public class DefaultLoginInterpreterTest {
 
         assertEquals("[red]Names must begin with an upper case letter.\n[default]Please choose a name: ", result.toString());
         assertFalse(result.getSecret());
-        assertNull(connection.getScratch());
+        assertNull(connection.getName());
         assertEquals(ConnectionState.CREATE_CHOOSE_NAME, connection.getState());
     }
 
@@ -458,7 +458,7 @@ public class DefaultLoginInterpreterTest {
 
         assertEquals("[red]Names must not contain upper case letters other than the first.\n[default]Please choose a name: ", result.toString());
         assertFalse(result.getSecret());
-        assertNull(connection.getScratch());
+        assertNull(connection.getName());
         assertEquals(ConnectionState.CREATE_CHOOSE_NAME, connection.getState());
     }
 
@@ -476,7 +476,7 @@ public class DefaultLoginInterpreterTest {
 
         assertEquals("[red]That name is already in use. Please try another!\n[default]Please choose a name: ", result.toString());
         assertFalse(result.getSecret());
-        assertNull(connection.getScratch());
+        assertNull(connection.getName());
         assertEquals(ConnectionState.CREATE_CHOOSE_NAME, connection.getState());
     }
 
@@ -517,7 +517,7 @@ public class DefaultLoginInterpreterTest {
         Connection connection = new Connection();
 
         input.setInput("Not!A_Real123Password");
-        connection.setScratch("Dani");
+        connection.setName("Dani");
         connection.setState(ConnectionState.CREATE_CHOOSE_PASSWORD);
         connection.setHttpSessionId(UUID.randomUUID().toString());
 
@@ -548,7 +548,7 @@ public class DefaultLoginInterpreterTest {
         Connection connection = new Connection();
 
         input.setInput("Not!A_R");
-        connection.setScratch("Dani");
+        connection.setName("Dani");
         connection.setState(ConnectionState.CREATE_CHOOSE_PASSWORD);
         connection.setHttpSessionId(UUID.randomUUID().toString());
 
@@ -570,7 +570,7 @@ public class DefaultLoginInterpreterTest {
         Connection connection = new Connection();
 
         input.setInput("Not!A_Real123Password");
-        connection.setScratch("Dani");
+        connection.setName("Dani");
         connection.setState(ConnectionState.CREATE_CHOOSE_PASSWORD);
         connection.setHttpSessionId(UUID.randomUUID().toString());
 
@@ -593,7 +593,7 @@ public class DefaultLoginInterpreterTest {
         Connection connection = new Connection();
 
         input.setInput("Not!A_Real123Password");
-        connection.setScratch("Dani");
+        connection.setName("Dani");
         connection.setState(ConnectionState.CREATE_CONFIRM_PASSWORD);
         connection.setHttpSessionId(UUID.randomUUID().toString());
 
@@ -629,7 +629,7 @@ public class DefaultLoginInterpreterTest {
         Connection connection = new Connection();
 
         input.setInput("Not!A_R");
-        connection.setScratch("Dani");
+        connection.setName("Dani");
         connection.setState(ConnectionState.CREATE_CONFIRM_PASSWORD);
         connection.setHttpSessionId(UUID.randomUUID().toString());
 
@@ -651,7 +651,7 @@ public class DefaultLoginInterpreterTest {
         Connection connection = new Connection();
 
         input.setInput("Not!A_Real123Password");
-        connection.setScratch("Dani");
+        connection.setName("Dani");
         connection.setState(ConnectionState.CREATE_CONFIRM_PASSWORD);
         connection.setHttpSessionId(UUID.randomUUID().toString());
 
@@ -661,7 +661,7 @@ public class DefaultLoginInterpreterTest {
         Output result = interpreter.interpret(input, connection);
 
         verifyZeroInteractions(sessionRepository, session);
-        verify(userDetailsManager).deleteUser(eq(connection.getScratch()));
+        verify(userDetailsManager).deleteUser(eq(connection.getName()));
 
         assertEquals("[red]Passwords do not match. Please try again!\n[default]Please choose a password: ", result.toString());
         assertTrue(result.getSecret());
@@ -674,14 +674,14 @@ public class DefaultLoginInterpreterTest {
         Connection connection = new Connection();
 
         input.setInput("Hello world!");
-        connection.setScratch("Dani");
+        connection.setName("Dani");
         connection.setState(ConnectionState.IN_GAME);
 
         Creature creatureA = new Creature();
         Connection connectionA = new Connection();
 
         connectionA.setSessionUsername("CreatureA");
-        connectionA.setScratch("CreatureA");
+        connectionA.setName("CreatureA");
         connectionA.setState(ConnectionState.IN_GAME);
         creatureA.setConnection(connectionA);
 
@@ -700,7 +700,7 @@ public class DefaultLoginInterpreterTest {
         Connection connection = new Connection();
 
         input.setInput("Hello world!");
-        connection.setScratch("Dani");
+        connection.setName("Dani");
         connection.setState(ConnectionState.IN_GAME);
 
         when(creatureRepository

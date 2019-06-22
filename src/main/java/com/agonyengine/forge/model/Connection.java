@@ -23,7 +23,7 @@ public class Connection {
     private String sessionId;
     private String httpSessionId;
     private String remoteAddress;
-    private String scratch;
+    private String name;
 
     @Enumerated(EnumType.STRING)
     private ConnectionState connectionState;
@@ -34,14 +34,6 @@ public class Connection {
 
     public void setId(UUID id) {
         this.id = id;
-    }
-
-    public ConnectionState getConnectionState() {
-        return connectionState;
-    }
-
-    public void setConnectionState(ConnectionState connectionState) {
-        this.connectionState = connectionState;
     }
 
     public String getSessionUsername() {
@@ -84,12 +76,12 @@ public class Connection {
         this.connectionState = connectionState;
     }
 
-    public String getScratch() {
-        return scratch;
+    public String getName() {
+        return name;
     }
 
-    public void setScratch(String scratch) {
-        this.scratch = scratch;
+    public void setName(String name) {
+        this.name = name;
     }
 
     @Override

@@ -75,7 +75,7 @@ public class DefaultLoginInterpreter extends BaseInterpreter {
                 break;
             case LOGIN_ASK_NAME:
                 try {
-                    connection.setScratch(validateName(input.toString()));
+                    connection.setName(validateName(input.toString()));
                     connection.setState(ConnectionState.LOGIN_ASK_PASSWORD);
                 } catch (InvalidInputException e) {
                     output.append("[red]" + e.getMessage());
@@ -83,27 +83,27 @@ public class DefaultLoginInterpreter extends BaseInterpreter {
                 break;
             case LOGIN_ASK_PASSWORD:
                 try {
-                    logUserIn(connection.getScratch(), validatePassword(input.toString()), connection);
-                    buildCreature(connection.getScratch(), connection);
+                    logUserIn(connection.getName(), validatePassword(input.toString()), connection);
+                    buildCreature(connection.getName(), connection);
 
-                    output.append("[yellow]Welcome back, " + connection.getScratch() + "!");
+                    output.append("[yellow]Welcome back, " + connection.getName() + "!");
 
-                    LOGGER.info("Successful login for {} from {}", connection.getScratch(), connection.getRemoteAddress());
+                    LOGGER.info("Successful login for {} from {}", connection.getName(), connection.getRemoteAddress());
                 } catch (InvalidInputException e) {
                     output.append("[red]" + e.getMessage());
                 } catch (BadCredentialsException e) {
                     output.append("[red]Sorry! Please try again!");
-                    LOGGER.warn("Bad password attempt for {} from {}", connection.getScratch(), connection.getRemoteAddress());
+                    LOGGER.warn("Bad password attempt for {} from {}", connection.getName(), connection.getRemoteAddress());
                     connection.setState(ConnectionState.ASK_NEW);
                 }
                 break;
             case CREATE_CHOOSE_NAME:
                 try {
-                    connection.setScratch(validateName(input.toString()));
+                    connection.setName(validateName(input.toString()));
 
-                    if (userDetailsManager.userExists(connection.getScratch())) {
+                    if (userDetailsManager.userExists(connection.getName())) {
                         output.append("[red]That name is already in use. Please try another!");
-                        connection.setScratch(null);
+                        connection.setName(null);
                     } else {
                         connection.setState(ConnectionState.CREATE_CONFIRM_NAME);
                     }
@@ -121,7 +121,7 @@ public class DefaultLoginInterpreter extends BaseInterpreter {
             case CREATE_CHOOSE_PASSWORD:
                 try {
                     User user = new User(
-                        connection.getScratch(),
+                        connection.getName(),
                         passwordEncoder.encode(validatePassword(input.toString())),
                         true,
                         true,
@@ -131,7 +131,7 @@ public class DefaultLoginInterpreter extends BaseInterpreter {
 
                     userDetailsManager.createUser(user);
 
-                    logUserIn(connection.getScratch(), validatePassword(input.toString()), connection);
+                    logUserIn(connection.getName(), validatePassword(input.toString()), connection);
                     connection.setState(ConnectionState.CREATE_CONFIRM_PASSWORD);
                 } catch (InvalidInputException e) {
                     output.append("[red]" + e.getMessage());
@@ -143,17 +143,17 @@ public class DefaultLoginInterpreter extends BaseInterpreter {
                 break;
             case CREATE_CONFIRM_PASSWORD:
                 try {
-                    logUserIn(connection.getScratch(), validatePassword(input.toString()), connection);
-                    buildCreature(connection.getScratch(), connection);
+                    logUserIn(connection.getName(), validatePassword(input.toString()), connection);
+                    buildCreature(connection.getName(), connection);
 
-                    output.append("[yellow]Welcome, " + connection.getScratch() + "!");
+                    output.append("[yellow]Welcome, " + connection.getName() + "!");
 
-                    LOGGER.info("New player {} from {}", connection.getScratch(), connection.getRemoteAddress());
+                    LOGGER.info("New player {} from {}", connection.getName(), connection.getRemoteAddress());
                 } catch (InvalidInputException e) {
                     output.append("[red]" + e.getMessage());
                 } catch (BadCredentialsException e) {
                     output.append("[red]Passwords do not match. Please try again!");
-                    userDetailsManager.deleteUser(connection.getScratch());
+                    userDetailsManager.deleteUser(connection.getName());
                     connection.setState(ConnectionState.CREATE_CHOOSE_PASSWORD);
                 }
                 break;
@@ -163,7 +163,7 @@ public class DefaultLoginInterpreter extends BaseInterpreter {
                     .orElseThrow(() -> new NullPointerException("Unable to find Creature for Connection " + connection.getId()));
 
                 output.append("[green]You gossip '" + input.toString() + "[green]'");
-                echoToWorld(new Output("[green]" + connection.getScratch() + " gossips '" + input.toString() + "[green]'"), creature);
+                echoToWorld(new Output("[green]" + connection.getName() + " gossips '" + input.toString() + "[green]'"), creature);
                 break;
             default:
                 output.append("[red]Oops! Something went wrong. The error has been logged.");
@@ -187,13 +187,13 @@ public class DefaultLoginInterpreter extends BaseInterpreter {
             case CREATE_CHOOSE_NAME:
                 return new Output("[default]Please choose a name: ");
             case CREATE_CONFIRM_NAME:
-                return new Output("[default]Are you sure '" + connection.getScratch() + "' is the name you want? [y/N]: ");
+                return new Output("[default]Are you sure '" + connection.getName() + "' is the name you want? [y/N]: ");
             case CREATE_CHOOSE_PASSWORD:
                 return new Output("[default]Please choose a password: ").setSecret(true);
             case CREATE_CONFIRM_PASSWORD:
                 return new Output("[default]Please confirm your password: ").setSecret(true);
             case IN_GAME:
-                return new Output("", String.format("[default]%s> ", connection.getScratch()));
+                return new Output("", String.format("[default]%s> ", connection.getName()));
             default:
                 LOGGER.error("Reached default state in prompt()!");
                 return new Output("[red]Oops! Something went wrong. The error has been logged.");
