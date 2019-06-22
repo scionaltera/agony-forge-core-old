@@ -1,6 +1,5 @@
 package com.agonyengine.forge.controller;
 
-import com.agonyengine.forge.model.Creature;
 import com.agonyengine.forge.repository.CreatureRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,13 +30,17 @@ public class SessionDisconnectListener implements ApplicationListener<SessionDis
         Map<String, Object> attributes = headerAccessor.getSessionAttributes();
 
         if (attributes != null) {
-            Creature creature = creatureRepository.findByConnectionSessionUsernameAndConnectionSessionId(
-                (String) attributes.get(AGONY_STOMP_PRINCIPAL_KEY),
-                (String) attributes.get(AGONY_STOMP_SESSION_KEY));
+            creatureRepository
+                .findByConnectionSessionUsernameAndConnectionSessionId(
+                    (String) attributes.get(AGONY_STOMP_PRINCIPAL_KEY),
+                    (String) attributes.get(AGONY_STOMP_SESSION_KEY))
+                .ifPresent(creature -> creatureRepository.delete(creature));
 
-            creatureRepository.delete(creature);
+            LOGGER.info("Lost connection from {}", attributes.get(AGONY_REMOTE_IP_KEY));
+
+            return;
         }
 
-        LOGGER.info("Lost connection from {}", attributes == null ? "(unknown)" : attributes.get(AGONY_REMOTE_IP_KEY));
+        LOGGER.error("Unable to fetch session attributes from message!");
     }
 }

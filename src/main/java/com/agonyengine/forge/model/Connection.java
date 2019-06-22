@@ -4,6 +4,8 @@ import org.hibernate.annotations.GenericGenerator;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
+import javax.persistence.EnumType;
+import javax.persistence.Enumerated;
 import javax.persistence.GeneratedValue;
 import javax.persistence.Id;
 import java.util.Objects;
@@ -19,7 +21,12 @@ public class Connection {
 
     private String sessionUsername;
     private String sessionId;
+    private String httpSessionId;
     private String remoteAddress;
+    private String scratch;
+
+    @Enumerated(EnumType.STRING)
+    private ConnectionState connectionState;
 
     public UUID getId() {
         return id;
@@ -27,6 +34,14 @@ public class Connection {
 
     public void setId(UUID id) {
         this.id = id;
+    }
+
+    public ConnectionState getConnectionState() {
+        return connectionState;
+    }
+
+    public void setConnectionState(ConnectionState connectionState) {
+        this.connectionState = connectionState;
     }
 
     public String getSessionUsername() {
@@ -45,6 +60,14 @@ public class Connection {
         this.sessionId = sessionId;
     }
 
+    public String getHttpSessionId() {
+        return httpSessionId;
+    }
+
+    public void setHttpSessionId(String httpSessionId) {
+        this.httpSessionId = httpSessionId;
+    }
+
     public String getRemoteAddress() {
         return remoteAddress;
     }
@@ -53,19 +76,32 @@ public class Connection {
         this.remoteAddress = remoteAddress;
     }
 
+    public ConnectionState getState() {
+        return connectionState;
+    }
+
+    public void setState(ConnectionState connectionState) {
+        this.connectionState = connectionState;
+    }
+
+    public String getScratch() {
+        return scratch;
+    }
+
+    public void setScratch(String scratch) {
+        this.scratch = scratch;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (!(o instanceof Connection)) return false;
         Connection that = (Connection) o;
-        return Objects.equals(getId(), that.getId()) &&
-            Objects.equals(getSessionUsername(), that.getSessionUsername()) &&
-            Objects.equals(getSessionId(), that.getSessionId()) &&
-            Objects.equals(getRemoteAddress(), that.getRemoteAddress());
+        return Objects.equals(getId(), that.getId());
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(getId(), getSessionUsername(), getSessionId(), getRemoteAddress());
+        return Objects.hash(getId());
     }
 }
