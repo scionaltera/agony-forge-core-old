@@ -2,6 +2,9 @@ package com.agonyengine.forge.controller;
 
 import com.agonyengine.forge.controller.greeting.GreetingLoader;
 import com.agonyengine.forge.controller.interpret.Interpreter;
+import com.agonyengine.forge.model.Connection;
+import com.agonyengine.forge.model.ConnectionState;
+import com.agonyengine.forge.repository.ConnectionRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.messaging.Message;
@@ -14,36 +17,58 @@ import org.springframework.stereotype.Controller;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.transaction.Transactional;
+import java.security.Principal;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
-import static com.agonyengine.forge.controller.ControllerConstants.AGONY_REMOTE_IP_KEY;
+import static com.agonyengine.forge.controller.ControllerConstants.*;
+import static org.springframework.web.socket.server.support.HttpSessionHandshakeInterceptor.HTTP_SESSION_ID_ATTR_NAME;
 
 @Controller
 public class WebSocketController {
     private static final Logger LOGGER = LoggerFactory.getLogger(WebSocketController.class);
 
     private List<String> greeting;
+    private ConnectionRepository connectionRepository;
     private Interpreter interpreter;
 
     @Inject
     public WebSocketController(
         @Named("compositeGreetingLoader") GreetingLoader greetingLoader,
+        ConnectionRepository connectionRepository,
         @Named("defaultLoginInterpreter") Interpreter interpreter) {
 
         greeting = greetingLoader.load();
+        this.connectionRepository = connectionRepository;
         this.interpreter = interpreter;
     }
 
     @Transactional
     @SubscribeMapping("/queue/output")
-    public Output onSubscribe(Message<byte[]> message) {
+    public Output onSubscribe(Principal principal, Message <byte[]> message) {
         SimpMessageHeaderAccessor headerAccessor = SimpMessageHeaderAccessor.wrap(message);
         Map<String, Object> attributes = headerAccessor.getSessionAttributes();
+        Connection connection = new Connection();
 
-        LOGGER.info("New connection from {}", attributes == null ? "(unknown)" : attributes.get(AGONY_REMOTE_IP_KEY));
+        if (attributes != null) {
+            connection.setSessionUsername(principal.getName());
+            connection.setSessionId(headerAccessor.getSessionId());
+            connection.setHttpSessionId((String) attributes.get(HTTP_SESSION_ID_ATTR_NAME));
+            connection.setRemoteAddress((String) attributes.get(AGONY_REMOTE_IP_KEY));
+            connection.setState(ConnectionState.ASK_NEW);
 
-        return new Output(greeting).append(interpreter.prompt(attributes));
+            Connection saved = connectionRepository.save(connection);
+
+            attributes.put(AGONY_CONNECTION_ID_KEY, saved.getId());
+
+            LOGGER.info("New connection from {}", attributes.get(AGONY_REMOTE_IP_KEY));
+
+            return new Output(greeting).append(interpreter.prompt(connection));
+        }
+
+        LOGGER.error("Unable to get session attributes!");
+        return new Output("[red]Something went wrong! The error has been logged.");
     }
 
     @Transactional
@@ -53,6 +78,16 @@ public class WebSocketController {
         SimpMessageHeaderAccessor headerAccessor = SimpMessageHeaderAccessor.wrap(message);
         Map<String, Object> attributes = headerAccessor.getSessionAttributes();
 
-        return interpreter.interpret(input, attributes);
+        if (attributes != null) {
+            UUID connectionId = (UUID) attributes.get(AGONY_CONNECTION_ID_KEY);
+            Connection connection = connectionRepository
+                .findById(connectionId)
+                .orElseThrow(() -> new NullPointerException("Unable to fetch Connection by ID: " + connectionId));
+
+            return interpreter.interpret(input, connection);
+        }
+
+        LOGGER.error("Unable to get session attributes!");
+        return new Output("[red]Something went wrong! The error has been logged.");
     }
 }
