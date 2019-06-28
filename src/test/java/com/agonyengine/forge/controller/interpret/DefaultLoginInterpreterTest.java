@@ -1,5 +1,6 @@
 package com.agonyengine.forge.controller.interpret;
 
+import com.agonyengine.forge.config.LoginConfiguration;
 import com.agonyengine.forge.controller.Input;
 import com.agonyengine.forge.controller.Output;
 import com.agonyengine.forge.model.Connection;
@@ -23,6 +24,8 @@ import org.springframework.security.provisioning.UserDetailsManager;
 import org.springframework.session.Session;
 import org.springframework.session.SessionRepository;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Stream;
@@ -60,11 +63,15 @@ public class DefaultLoginInterpreterTest {
     @Captor
     private ArgumentCaptor<Creature> creatureCaptor;
 
+    private LoginConfiguration loginConfiguration = new LoginConfiguration();
+
     private DefaultLoginInterpreter interpreter;
 
     @Before
     public void setUp() {
         MockitoAnnotations.initMocks(this);
+
+        loginConfiguration.setPrompt(buildPromptMap());
 
         when(connectionRepository.save(any(Connection.class))).thenAnswer(invocation -> {
             Connection connection = invocation.getArgument(0);
@@ -79,6 +86,7 @@ public class DefaultLoginInterpreterTest {
         when(creatureRepository.findByConnection(any(Connection.class))).thenReturn(Optional.of(creature));
 
         interpreter = new DefaultLoginInterpreter(
+            loginConfiguration,
             userDetailsManager,
             authenticationManager,
             sessionRepository,
@@ -300,25 +308,6 @@ public class DefaultLoginInterpreterTest {
     }
 
     @Test
-    public void testInterpretLoginAskPasswordTooShort() {
-        Input input = new Input();
-        Connection connection = new Connection();
-
-        input.setInput("Not!A_R");
-        connection.setName("Dani");
-        connection.setState(ConnectionState.LOGIN_ASK_PASSWORD);
-        connection.setHttpSessionId(UUID.randomUUID().toString());
-
-        Output result = interpreter.interpret(input, connection);
-
-        verifyZeroInteractions(sessionRepository, session);
-
-        assertEquals("[red]Passwords must be at least 8 characters.\n[default]Password: ", result.toString());
-        assertTrue(result.getSecret());
-        assertEquals(ConnectionState.LOGIN_ASK_PASSWORD, connection.getState());
-    }
-
-    @Test
     public void testInterpretAskNewYes() {
         Input input = new Input();
         Connection connection = new Connection();
@@ -516,7 +505,7 @@ public class DefaultLoginInterpreterTest {
         Input input = new Input();
         Connection connection = new Connection();
 
-        input.setInput("Not!A_Real123Password");
+        input.setInput("Not!A_PW");
         connection.setName("Dani");
         connection.setState(ConnectionState.CREATE_CHOOSE_PASSWORD);
         connection.setHttpSessionId(UUID.randomUUID().toString());
@@ -539,7 +528,7 @@ public class DefaultLoginInterpreterTest {
         Authentication authentication = securityContext.getAuthentication();
 
         assertEquals("Dani", authentication.getPrincipal());
-        assertEquals("Not!A_Real123Password", authentication.getCredentials());
+        assertEquals("Not!A_PW", authentication.getCredentials());
     }
 
     @Test
@@ -547,7 +536,7 @@ public class DefaultLoginInterpreterTest {
         Input input = new Input();
         Connection connection = new Connection();
 
-        input.setInput("Not!A_R");
+        input.setInput("Not!A_P");
         connection.setName("Dani");
         connection.setState(ConnectionState.CREATE_CHOOSE_PASSWORD);
         connection.setHttpSessionId(UUID.randomUUID().toString());
@@ -713,5 +702,20 @@ public class DefaultLoginInterpreterTest {
         } catch (NullPointerException e) {
             assertTrue(e.getMessage().startsWith("Unable to find Creature for Connection "));
         }
+    }
+
+    private Map<String, String> buildPromptMap() {
+        Map<String, String> prompts = new HashMap<>();
+
+        prompts.put("askNew", "[default]Create a new character? [y/N]: ");
+        prompts.put("loginAskName", "[default]Name: ");
+        prompts.put("loginAskPassword", "[default]Password: ");
+        prompts.put("createChooseName", "[default]Please choose a name: ");
+        prompts.put("createConfirmName", "[default]Are you sure '%name%' is the name you want? [y/N]: ");
+        prompts.put("createChoosePassword", "[default]Please choose a password: ");
+        prompts.put("createConfirmPassword", "[default]Please confirm your password: ");
+        prompts.put("inGame", "[default]%name%> ");
+
+        return prompts;
     }
 }
