@@ -20,3 +20,15 @@ logging:
                 # but no HTTP session exists. It's not a fatal error because the session gets created and everything
                 # still works out. It's the only log message in the class, so let's turn it off.
                 WebSocketConnectHandlerDecoratorFactory: OFF
+
+agony:
+  login:
+    prompt:
+      askNew: "[default]Create a new character? [y/N]: "
+      loginAskName: "[default]Name: "
+      loginAskPassword: "[default]Password: "
+      createChooseName: "[default]Please choose a name: "
+      createConfirmName: "[default]Are you sure '%name%' is the name you want? [y/N]: "
+      createChoosePassword: "[default]Please choose a password: "
+      createConfirmPassword: "[default]Please confirm your password: "
+      inGame: "[default]%name%> "

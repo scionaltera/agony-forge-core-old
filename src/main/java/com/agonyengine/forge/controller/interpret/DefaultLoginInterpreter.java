@@ -1,5 +1,6 @@
 package com.agonyengine.forge.controller.interpret;
 
+import com.agonyengine.forge.config.LoginConfiguration;
 import com.agonyengine.forge.controller.Input;
 import com.agonyengine.forge.controller.Output;
 import com.agonyengine.forge.model.Connection;
@@ -35,6 +36,7 @@ import static org.springframework.security.web.context.HttpSessionSecurityContex
 public class DefaultLoginInterpreter extends BaseInterpreter {
     private static final Logger LOGGER = LoggerFactory.getLogger(DefaultLoginInterpreter.class);
 
+    private LoginConfiguration loginConfiguration;
     private UserDetailsManager userDetailsManager;
     private AuthenticationManager authenticationManager;
     private PasswordEncoder passwordEncoder;
@@ -43,15 +45,18 @@ public class DefaultLoginInterpreter extends BaseInterpreter {
     private CreatureRepository creatureRepository;
 
     @Inject
-    public DefaultLoginInterpreter(@SuppressWarnings("SpringJavaInjectionPointsAutowiringInspection") UserDetailsManager userDetailsManager,
-                                   AuthenticationManager authenticationManager,
-                                   SessionRepository sessionRepository,
-                                   ConnectionRepository connectionRepository,
-                                   CreatureRepository creatureRepository,
-                                   SimpMessagingTemplate simpMessagingTemplate) {
+    public DefaultLoginInterpreter(
+        LoginConfiguration loginConfiguration,
+        @SuppressWarnings("SpringJavaInjectionPointsAutowiringInspection") UserDetailsManager userDetailsManager,
+        AuthenticationManager authenticationManager,
+        SessionRepository sessionRepository,
+        ConnectionRepository connectionRepository,
+        CreatureRepository creatureRepository,
+        SimpMessagingTemplate simpMessagingTemplate) {
 
         super(creatureRepository, simpMessagingTemplate);
 
+        this.loginConfiguration = loginConfiguration;
         this.userDetailsManager = userDetailsManager;
         this.authenticationManager = authenticationManager;
         this.passwordEncoder = PasswordEncoderFactories.createDelegatingPasswordEncoder();
@@ -83,14 +88,12 @@ public class DefaultLoginInterpreter extends BaseInterpreter {
                 break;
             case LOGIN_ASK_PASSWORD:
                 try {
-                    logUserIn(connection.getName(), validatePassword(input.toString()), connection);
+                    logUserIn(connection.getName(), input.toString(), connection);
                     buildCreature(connection.getName(), connection);
 
                     output.append("[yellow]Welcome back, " + connection.getName() + "!");
 
                     LOGGER.info("Successful login for {} from {}", connection.getName(), connection.getRemoteAddress());
-                } catch (InvalidInputException e) {
-                    output.append("[red]" + e.getMessage());
                 } catch (BadCredentialsException e) {
                     output.append("[red]Sorry! Please try again!");
                     LOGGER.warn("Bad password attempt for {} from {}", connection.getName(), connection.getRemoteAddress());
@@ -179,21 +182,21 @@ public class DefaultLoginInterpreter extends BaseInterpreter {
 
         switch (connection.getState()) {
             case ASK_NEW:
-                return new Output("[default]Create a new character? [y/N]: ");
+                return new Output(loginConfiguration.getPrompt("askNew", connection));
             case LOGIN_ASK_NAME:
-                return new Output("[default]Name: ");
+                return new Output(loginConfiguration.getPrompt("loginAskName", connection));
             case LOGIN_ASK_PASSWORD:
-                return new Output("[default]Password: ").setSecret(true);
+                return new Output(loginConfiguration.getPrompt("loginAskPassword", connection)).setSecret(true);
             case CREATE_CHOOSE_NAME:
-                return new Output("[default]Please choose a name: ");
+                return new Output(loginConfiguration.getPrompt("createChooseName", connection));
             case CREATE_CONFIRM_NAME:
-                return new Output("[default]Are you sure '" + connection.getName() + "' is the name you want? [y/N]: ");
+                return new Output(loginConfiguration.getPrompt("createConfirmName", connection));
             case CREATE_CHOOSE_PASSWORD:
-                return new Output("[default]Please choose a password: ").setSecret(true);
+                return new Output(loginConfiguration.getPrompt("createChoosePassword", connection)).setSecret(true);
             case CREATE_CONFIRM_PASSWORD:
-                return new Output("[default]Please confirm your password: ").setSecret(true);
+                return new Output(loginConfiguration.getPrompt("createConfirmPassword", connection)).setSecret(true);
             case IN_GAME:
-                return new Output("", String.format("[default]%s> ", connection.getName()));
+                return new Output("", loginConfiguration.getPrompt("inGame", connection));
             default:
                 LOGGER.error("Reached default state in prompt()!");
                 return new Output("[red]Oops! Something went wrong. The error has been logged.");
