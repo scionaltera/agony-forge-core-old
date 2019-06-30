@@ -4,7 +4,6 @@ import com.agonyengine.forge.config.LoginConfiguration;
 import com.agonyengine.forge.controller.Input;
 import com.agonyengine.forge.controller.Output;
 import com.agonyengine.forge.model.Connection;
-import com.agonyengine.forge.model.ConnectionState;
 import com.agonyengine.forge.model.Creature;
 import com.agonyengine.forge.repository.ConnectionRepository;
 import com.agonyengine.forge.repository.CreatureRepository;
@@ -14,7 +13,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.Authentication;
@@ -24,18 +22,18 @@ import org.springframework.security.provisioning.UserDetailsManager;
 import org.springframework.session.Session;
 import org.springframework.session.SessionRepository;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.stream.Stream;
 
+import static com.agonyengine.forge.model.DefaultLoginConnectionState.*;
+import static com.agonyengine.forge.model.PrimaryConnectionState.IN_GAME;
+import static com.agonyengine.forge.model.PrimaryConnectionState.LOGIN;
 import static org.junit.Assert.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import static org.springframework.security.web.context.HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY;
 
-public class DefaultLoginInterpreterTest {
+public class DefaultLoginInterpreterDelegateTest {
     @Mock
     private UserDetailsManager userDetailsManager;
 
@@ -55,7 +53,7 @@ public class DefaultLoginInterpreterTest {
     private Session session;
 
     @Mock
-    private SimpMessagingTemplate simpMessagingTemplate;
+    private Interpreter primary;
 
     @Captor
     private ArgumentCaptor<SecurityContext> securityContextCaptor;
@@ -63,15 +61,23 @@ public class DefaultLoginInterpreterTest {
     @Captor
     private ArgumentCaptor<Creature> creatureCaptor;
 
-    private LoginConfiguration loginConfiguration = new LoginConfiguration();
-
-    private DefaultLoginInterpreter interpreter;
+    private DefaultLoginInterpreterDelegate interpreter;
 
     @Before
     public void setUp() {
         MockitoAnnotations.initMocks(this);
 
-        loginConfiguration.setPrompt(buildPromptMap());
+        LoginConfiguration loginConfiguration = new LoginConfigurationBuilder().build();
+
+        when(primary.prompt(any(Connection.class))).thenAnswer(invocation -> {
+            Connection connection = invocation.getArgument(0);
+
+            if (LOGIN.equals(connection.getPrimaryState())) {
+                return interpreter.prompt(primary, connection);
+            } else {
+                return new Output("", "[default]Dani> ");
+            }
+        });
 
         when(connectionRepository.save(any(Connection.class))).thenAnswer(invocation -> {
             Connection connection = invocation.getArgument(0);
@@ -85,22 +91,55 @@ public class DefaultLoginInterpreterTest {
 
         when(creatureRepository.findByConnection(any(Connection.class))).thenReturn(Optional.of(creature));
 
-        interpreter = new DefaultLoginInterpreter(
+        interpreter = new DefaultLoginInterpreterDelegate(
             loginConfiguration,
             userDetailsManager,
             authenticationManager,
             sessionRepository,
             connectionRepository,
-            creatureRepository,
-            simpMessagingTemplate);
+            creatureRepository);
+    }
+
+    @Test
+    public void testPromptBadSecondaryState() {
+        Connection connection = new Connection();
+        connection.setPrimaryState(LOGIN);
+        connection.setSecondaryState("INVALID");
+
+        try {
+            interpreter.prompt(primary, connection);
+
+            fail("Required exception was not thrown");
+        } catch (IllegalArgumentException e) {
+            assertTrue(e.getMessage().startsWith("No enum constant"));
+        }
+    }
+
+    @Test
+    public void testInterpretBadSecondaryState() {
+        Input input = new Input();
+        Connection connection = new Connection();
+
+        input.setInput("input");
+        connection.setPrimaryState(LOGIN);
+        connection.setSecondaryState("INVALID");
+
+        try {
+            interpreter.interpret(primary, input, connection);
+
+            fail("Required exception was not thrown");
+        } catch (IllegalArgumentException e) {
+            assertTrue(e.getMessage().startsWith("No enum constant"));
+        }
     }
 
     @Test
     public void testPromptAskNew() {
         Connection connection = new Connection();
-        connection.setState(ConnectionState.ASK_NEW);
+        connection.setPrimaryState(LOGIN);
+        connection.setSecondaryState("DEFAULT");
 
-        Output result = interpreter.prompt(connection);
+        Output result = interpreter.prompt(primary, connection);
 
         assertEquals("[default]Create a new character? [y/N]: ", result.toString());
         assertFalse(result.getSecret());
@@ -112,13 +151,15 @@ public class DefaultLoginInterpreterTest {
         Connection connection = new Connection();
 
         input.setInput("n");
-        connection.setState(ConnectionState.ASK_NEW);
+        connection.setPrimaryState(LOGIN);
+        connection.setSecondaryState(DEFAULT.name());
 
-        Output result = interpreter.interpret(input, connection);
+        Output result = interpreter.interpret(primary, input, connection);
 
         assertEquals("[default]Name: ", result.toString());
         assertFalse(result.getSecret());
-        assertEquals(ConnectionState.LOGIN_ASK_NAME, connection.getState());
+        assertEquals(LOGIN, connection.getPrimaryState());
+        assertEquals(LOGIN_ASK_NAME.name(), connection.getSecondaryState());
     }
 
     @Test
@@ -127,14 +168,16 @@ public class DefaultLoginInterpreterTest {
         Connection connection = new Connection();
 
         input.setInput("Dan");
-        connection.setState(ConnectionState.LOGIN_ASK_NAME);
+        connection.setPrimaryState(LOGIN);
+        connection.setSecondaryState(LOGIN_ASK_NAME.name());
 
-        Output result = interpreter.interpret(input, connection);
+        Output result = interpreter.interpret(primary, input, connection);
 
         assertEquals("[default]Password: ", result.toString());
         assertTrue(result.getSecret());
         assertEquals("Dan", connection.getName());
-        assertEquals(ConnectionState.LOGIN_ASK_PASSWORD, connection.getState());
+        assertEquals(LOGIN, connection.getPrimaryState());
+        assertEquals(LOGIN_ASK_PASSWORD.name(), connection.getSecondaryState());
     }
 
     @Test
@@ -143,14 +186,16 @@ public class DefaultLoginInterpreterTest {
         Connection connection = new Connection();
 
         input.setInput("Danidanidanidanidanidanidanida");
-        connection.setState(ConnectionState.LOGIN_ASK_NAME);
+        connection.setPrimaryState(LOGIN);
+        connection.setSecondaryState(LOGIN_ASK_NAME.name());
 
-        Output result = interpreter.interpret(input, connection);
+        Output result = interpreter.interpret(primary, input, connection);
 
         assertEquals("[default]Password: ", result.toString());
         assertTrue(result.getSecret());
         assertEquals("Danidanidanidanidanidanidanida", connection.getName());
-        assertEquals(ConnectionState.LOGIN_ASK_PASSWORD, connection.getState());
+        assertEquals(LOGIN, connection.getPrimaryState());
+        assertEquals(LOGIN_ASK_PASSWORD.name(), connection.getSecondaryState());
     }
 
     @Test
@@ -159,14 +204,16 @@ public class DefaultLoginInterpreterTest {
         Connection connection = new Connection();
 
         input.setInput("Dani Filth");
-        connection.setState(ConnectionState.LOGIN_ASK_NAME);
+        connection.setPrimaryState(LOGIN);
+        connection.setSecondaryState(LOGIN_ASK_NAME.name());
 
-        Output result = interpreter.interpret(input, connection);
+        Output result = interpreter.interpret(primary, input, connection);
 
         assertEquals("[red]Names may not contain whitespace.\n[default]Name: ", result.toString());
         assertFalse(result.getSecret());
         assertNull(connection.getName());
-        assertEquals(ConnectionState.LOGIN_ASK_NAME, connection.getState());
+        assertEquals(LOGIN, connection.getPrimaryState());
+        assertEquals(LOGIN_ASK_NAME.name(), connection.getSecondaryState());
     }
 
     @Test
@@ -175,14 +222,16 @@ public class DefaultLoginInterpreterTest {
         Connection connection = new Connection();
 
         input.setInput("Dani3");
-        connection.setState(ConnectionState.LOGIN_ASK_NAME);
+        connection.setPrimaryState(LOGIN);
+        connection.setSecondaryState(LOGIN_ASK_NAME.name());
 
-        Output result = interpreter.interpret(input, connection);
+        Output result = interpreter.interpret(primary, input, connection);
 
         assertEquals("[red]Names may only contain letters.\n[default]Name: ", result.toString());
         assertFalse(result.getSecret());
         assertNull(connection.getName());
-        assertEquals(ConnectionState.LOGIN_ASK_NAME, connection.getState());
+        assertEquals(LOGIN, connection.getPrimaryState());
+        assertEquals(LOGIN_ASK_NAME.name(), connection.getSecondaryState());
     }
 
     @Test
@@ -191,14 +240,16 @@ public class DefaultLoginInterpreterTest {
         Connection connection = new Connection();
 
         input.setInput("Da");
-        connection.setState(ConnectionState.LOGIN_ASK_NAME);
+        connection.setPrimaryState(LOGIN);
+        connection.setSecondaryState(LOGIN_ASK_NAME.name());
 
-        Output result = interpreter.interpret(input, connection);
+        Output result = interpreter.interpret(primary, input, connection);
 
         assertEquals("[red]Names must be at least 3 letters long.\n[default]Name: ", result.toString());
         assertFalse(result.getSecret());
         assertNull(connection.getName());
-        assertEquals(ConnectionState.LOGIN_ASK_NAME, connection.getState());
+        assertEquals(LOGIN, connection.getPrimaryState());
+        assertEquals(LOGIN_ASK_NAME.name(), connection.getSecondaryState());
     }
 
     @Test
@@ -207,14 +258,16 @@ public class DefaultLoginInterpreterTest {
         Connection connection = new Connection();
 
         input.setInput("Danidanidanidanidanidanidanidan");
-        connection.setState(ConnectionState.LOGIN_ASK_NAME);
+        connection.setPrimaryState(LOGIN);
+        connection.setSecondaryState(LOGIN_ASK_NAME.name());
 
-        Output result = interpreter.interpret(input, connection);
+        Output result = interpreter.interpret(primary, input, connection);
 
         assertEquals("[red]Names may not be longer than 30 letters.\n[default]Name: ", result.toString());
         assertFalse(result.getSecret());
         assertNull(connection.getName());
-        assertEquals(ConnectionState.LOGIN_ASK_NAME, connection.getState());
+        assertEquals(LOGIN, connection.getPrimaryState());
+        assertEquals(LOGIN_ASK_NAME.name(), connection.getSecondaryState());
     }
 
     @Test
@@ -223,14 +276,16 @@ public class DefaultLoginInterpreterTest {
         Connection connection = new Connection();
 
         input.setInput("dani");
-        connection.setState(ConnectionState.LOGIN_ASK_NAME);
+        connection.setPrimaryState(LOGIN);
+        connection.setSecondaryState(LOGIN_ASK_NAME.name());
 
-        Output result = interpreter.interpret(input, connection);
+        Output result = interpreter.interpret(primary, input, connection);
 
         assertEquals("[red]Names must begin with an upper case letter.\n[default]Name: ", result.toString());
         assertFalse(result.getSecret());
         assertNull(connection.getName());
-        assertEquals(ConnectionState.LOGIN_ASK_NAME, connection.getState());
+        assertEquals(LOGIN, connection.getPrimaryState());
+        assertEquals(LOGIN_ASK_NAME.name(), connection.getSecondaryState());
     }
 
     @Test
@@ -239,14 +294,16 @@ public class DefaultLoginInterpreterTest {
         Connection connection = new Connection();
 
         input.setInput("DAni");
-        connection.setState(ConnectionState.LOGIN_ASK_NAME);
+        connection.setPrimaryState(LOGIN);
+        connection.setSecondaryState(LOGIN_ASK_NAME.name());
 
-        Output result = interpreter.interpret(input, connection);
+        Output result = interpreter.interpret(primary, input, connection);
 
         assertEquals("[red]Names must not contain upper case letters other than the first.\n[default]Name: ", result.toString());
         assertFalse(result.getSecret());
         assertNull(connection.getName());
-        assertEquals(ConnectionState.LOGIN_ASK_NAME, connection.getState());
+        assertEquals(LOGIN, connection.getPrimaryState());
+        assertEquals(LOGIN_ASK_NAME.name(), connection.getSecondaryState());
     }
 
     @SuppressWarnings("unchecked")
@@ -257,13 +314,14 @@ public class DefaultLoginInterpreterTest {
 
         input.setInput("Not!A_Real123Password");
         connection.setName("Dani");
-        connection.setState(ConnectionState.LOGIN_ASK_PASSWORD);
+        connection.setPrimaryState(LOGIN);
+        connection.setSecondaryState(LOGIN_ASK_PASSWORD.name());
         connection.setHttpSessionId(UUID.randomUUID().toString());
 
         when(authenticationManager.authenticate(any(Authentication.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(sessionRepository.findById(anyString())).thenReturn(session);
 
-        Output result = interpreter.interpret(input, connection);
+        Output result = interpreter.interpret(primary, input, connection);
 
         verify(sessionRepository).findById(anyString());
         verify(session).setAttribute(eq(SPRING_SECURITY_CONTEXT_KEY), securityContextCaptor.capture());
@@ -272,7 +330,7 @@ public class DefaultLoginInterpreterTest {
 
         assertEquals("[yellow]Welcome back, Dani!\n\n[default]Dani> ", result.toString());
         assertFalse(result.getSecret());
-        assertEquals(ConnectionState.IN_GAME, connection.getState());
+        assertEquals(IN_GAME, connection.getPrimaryState());
 
         SecurityContext securityContext = securityContextCaptor.getValue();
         Authentication authentication = securityContext.getAuthentication();
@@ -293,18 +351,20 @@ public class DefaultLoginInterpreterTest {
 
         input.setInput("password");
         connection.setName("Dani");
-        connection.setState(ConnectionState.LOGIN_ASK_PASSWORD);
+        connection.setPrimaryState(LOGIN);
+        connection.setSecondaryState(LOGIN_ASK_PASSWORD.name());
         connection.setHttpSessionId(UUID.randomUUID().toString());
 
         when(authenticationManager.authenticate(any(Authentication.class))).thenThrow(new BadCredentialsException("Boom!"));
 
-        Output result = interpreter.interpret(input, connection);
+        Output result = interpreter.interpret(primary, input, connection);
 
         verifyZeroInteractions(sessionRepository, session);
 
         assertEquals("[red]Sorry! Please try again!\n[default]Create a new character? [y/N]: ", result.toString());
         assertFalse(result.getSecret());
-        assertEquals(ConnectionState.ASK_NEW, connection.getState());
+        assertEquals(LOGIN, connection.getPrimaryState());
+        assertEquals(DEFAULT.name(), connection.getSecondaryState());
     }
 
     @Test
@@ -312,15 +372,17 @@ public class DefaultLoginInterpreterTest {
         Input input = new Input();
         Connection connection = new Connection();
 
-        connection.setState(ConnectionState.ASK_NEW);
+        connection.setPrimaryState(LOGIN);
+        connection.setSecondaryState(DEFAULT.name());
 
         input.setInput("y");
 
-        Output result = interpreter.interpret(input, connection);
+        Output result = interpreter.interpret(primary, input, connection);
 
         assertEquals("[default]Please choose a name: ", result.toString());
         assertFalse(result.getSecret());
-        assertEquals(ConnectionState.CREATE_CHOOSE_NAME, connection.getState());
+        assertEquals(LOGIN, connection.getPrimaryState());
+        assertEquals(CREATE_CHOOSE_NAME.name(), connection.getSecondaryState());
     }
 
     @Test
@@ -329,14 +391,16 @@ public class DefaultLoginInterpreterTest {
         Connection connection = new Connection();
 
         input.setInput("Dan");
-        connection.setState(ConnectionState.CREATE_CHOOSE_NAME);
+        connection.setPrimaryState(LOGIN);
+        connection.setSecondaryState(CREATE_CHOOSE_NAME.name());
 
-        Output result = interpreter.interpret(input, connection);
+        Output result = interpreter.interpret(primary, input, connection);
 
         assertEquals("[default]Are you sure 'Dan' is the name you want? [y/N]: ", result.toString());
         assertFalse(result.getSecret());
         assertEquals("Dan", connection.getName());
-        assertEquals(ConnectionState.CREATE_CONFIRM_NAME, connection.getState());
+        assertEquals(LOGIN, connection.getPrimaryState());
+        assertEquals(CREATE_CONFIRM_NAME.name(), connection.getSecondaryState());
     }
 
     @Test
@@ -345,14 +409,16 @@ public class DefaultLoginInterpreterTest {
         Connection connection = new Connection();
 
         input.setInput("Danidanidanidanidanidanidanida");
-        connection.setState(ConnectionState.CREATE_CHOOSE_NAME);
+        connection.setPrimaryState(LOGIN);
+        connection.setSecondaryState(CREATE_CHOOSE_NAME.name());
 
-        Output result = interpreter.interpret(input, connection);
+        Output result = interpreter.interpret(primary, input, connection);
 
         assertEquals("[default]Are you sure 'Danidanidanidanidanidanidanida' is the name you want? [y/N]: ", result.toString());
         assertFalse(result.getSecret());
         assertEquals("Danidanidanidanidanidanidanida", connection.getName());
-        assertEquals(ConnectionState.CREATE_CONFIRM_NAME, connection.getState());
+        assertEquals(LOGIN, connection.getPrimaryState());
+        assertEquals(CREATE_CONFIRM_NAME.name(), connection.getSecondaryState());
     }
 
     @Test
@@ -361,14 +427,16 @@ public class DefaultLoginInterpreterTest {
         Connection connection = new Connection();
 
         input.setInput("Dani Filth");
-        connection.setState(ConnectionState.CREATE_CHOOSE_NAME);
+        connection.setPrimaryState(LOGIN);
+        connection.setSecondaryState(CREATE_CHOOSE_NAME.name());
 
-        Output result = interpreter.interpret(input, connection);
+        Output result = interpreter.interpret(primary, input, connection);
 
         assertEquals("[red]Names may not contain whitespace.\n[default]Please choose a name: ", result.toString());
         assertFalse(result.getSecret());
         assertNull(connection.getName());
-        assertEquals(ConnectionState.CREATE_CHOOSE_NAME, connection.getState());
+        assertEquals(LOGIN, connection.getPrimaryState());
+        assertEquals(CREATE_CHOOSE_NAME.name(), connection.getSecondaryState());
     }
 
     @Test
@@ -377,14 +445,16 @@ public class DefaultLoginInterpreterTest {
         Connection connection = new Connection();
 
         input.setInput("Dani3");
-        connection.setState(ConnectionState.CREATE_CHOOSE_NAME);
+        connection.setPrimaryState(LOGIN);
+        connection.setSecondaryState(CREATE_CHOOSE_NAME.name());
 
-        Output result = interpreter.interpret(input, connection);
+        Output result = interpreter.interpret(primary, input, connection);
 
         assertEquals("[red]Names may only contain letters.\n[default]Please choose a name: ", result.toString());
         assertFalse(result.getSecret());
         assertNull(connection.getName());
-        assertEquals(ConnectionState.CREATE_CHOOSE_NAME, connection.getState());
+        assertEquals(LOGIN, connection.getPrimaryState());
+        assertEquals(CREATE_CHOOSE_NAME.name(), connection.getSecondaryState());
     }
 
     @Test
@@ -393,14 +463,16 @@ public class DefaultLoginInterpreterTest {
         Connection connection = new Connection();
 
         input.setInput("Da");
-        connection.setState(ConnectionState.CREATE_CHOOSE_NAME);
+        connection.setPrimaryState(LOGIN);
+        connection.setSecondaryState(CREATE_CHOOSE_NAME.name());
 
-        Output result = interpreter.interpret(input, connection);
+        Output result = interpreter.interpret(primary, input, connection);
 
         assertEquals("[red]Names must be at least 3 letters long.\n[default]Please choose a name: ", result.toString());
         assertFalse(result.getSecret());
         assertNull(connection.getName());
-        assertEquals(ConnectionState.CREATE_CHOOSE_NAME, connection.getState());
+        assertEquals(LOGIN, connection.getPrimaryState());
+        assertEquals(CREATE_CHOOSE_NAME.name(), connection.getSecondaryState());
     }
 
     @Test
@@ -409,14 +481,16 @@ public class DefaultLoginInterpreterTest {
         Connection connection = new Connection();
 
         input.setInput("Danidanidanidanidanidanidanidan");
-        connection.setState(ConnectionState.CREATE_CHOOSE_NAME);
+        connection.setPrimaryState(LOGIN);
+        connection.setSecondaryState(CREATE_CHOOSE_NAME.name());
 
-        Output result = interpreter.interpret(input, connection);
+        Output result = interpreter.interpret(primary, input, connection);
 
         assertEquals("[red]Names may not be longer than 30 letters.\n[default]Please choose a name: ", result.toString());
         assertFalse(result.getSecret());
         assertNull(connection.getName());
-        assertEquals(ConnectionState.CREATE_CHOOSE_NAME, connection.getState());
+        assertEquals(LOGIN, connection.getPrimaryState());
+        assertEquals(CREATE_CHOOSE_NAME.name(), connection.getSecondaryState());
     }
 
     @Test
@@ -425,14 +499,16 @@ public class DefaultLoginInterpreterTest {
         Connection connection = new Connection();
 
         input.setInput("dani");
-        connection.setState(ConnectionState.CREATE_CHOOSE_NAME);
+        connection.setPrimaryState(LOGIN);
+        connection.setSecondaryState(CREATE_CHOOSE_NAME.name());
 
-        Output result = interpreter.interpret(input, connection);
+        Output result = interpreter.interpret(primary, input, connection);
 
         assertEquals("[red]Names must begin with an upper case letter.\n[default]Please choose a name: ", result.toString());
         assertFalse(result.getSecret());
         assertNull(connection.getName());
-        assertEquals(ConnectionState.CREATE_CHOOSE_NAME, connection.getState());
+        assertEquals(LOGIN, connection.getPrimaryState());
+        assertEquals(CREATE_CHOOSE_NAME.name(), connection.getSecondaryState());
     }
 
     @Test
@@ -441,14 +517,16 @@ public class DefaultLoginInterpreterTest {
         Connection connection = new Connection();
 
         input.setInput("DAni");
-        connection.setState(ConnectionState.CREATE_CHOOSE_NAME);
+        connection.setPrimaryState(LOGIN);
+        connection.setSecondaryState(CREATE_CHOOSE_NAME.name());
 
-        Output result = interpreter.interpret(input, connection);
+        Output result = interpreter.interpret(primary, input, connection);
 
         assertEquals("[red]Names must not contain upper case letters other than the first.\n[default]Please choose a name: ", result.toString());
         assertFalse(result.getSecret());
         assertNull(connection.getName());
-        assertEquals(ConnectionState.CREATE_CHOOSE_NAME, connection.getState());
+        assertEquals(LOGIN, connection.getPrimaryState());
+        assertEquals(CREATE_CHOOSE_NAME.name(), connection.getSecondaryState());
     }
 
     @Test
@@ -457,16 +535,18 @@ public class DefaultLoginInterpreterTest {
         Connection connection = new Connection();
 
         input.setInput("Dani");
-        connection.setState(ConnectionState.CREATE_CHOOSE_NAME);
+        connection.setPrimaryState(LOGIN);
+        connection.setSecondaryState(CREATE_CHOOSE_NAME.name());
 
         when(userDetailsManager.userExists(eq("Dani"))).thenReturn(true);
 
-        Output result = interpreter.interpret(input, connection);
+        Output result = interpreter.interpret(primary, input, connection);
 
         assertEquals("[red]That name is already in use. Please try another!\n[default]Please choose a name: ", result.toString());
         assertFalse(result.getSecret());
         assertNull(connection.getName());
-        assertEquals(ConnectionState.CREATE_CHOOSE_NAME, connection.getState());
+        assertEquals(LOGIN, connection.getPrimaryState());
+        assertEquals(CREATE_CHOOSE_NAME.name(), connection.getSecondaryState());
     }
 
     @Test
@@ -475,13 +555,15 @@ public class DefaultLoginInterpreterTest {
         Connection connection = new Connection();
 
         input.setInput("n");
-        connection.setState(ConnectionState.CREATE_CONFIRM_NAME);
+        connection.setPrimaryState(LOGIN);
+        connection.setSecondaryState(CREATE_CONFIRM_NAME.name());
 
-        Output result = interpreter.interpret(input, connection);
+        Output result = interpreter.interpret(primary, input, connection);
 
         assertEquals("[default]Please choose a name: ", result.toString());
         assertFalse(result.getSecret());
-        assertEquals(ConnectionState.CREATE_CHOOSE_NAME, connection.getState());
+        assertEquals(LOGIN, connection.getPrimaryState());
+        assertEquals(CREATE_CHOOSE_NAME.name(), connection.getSecondaryState());
     }
 
     @Test
@@ -490,13 +572,15 @@ public class DefaultLoginInterpreterTest {
         Connection connection = new Connection();
 
         input.setInput("y");
-        connection.setState(ConnectionState.CREATE_CONFIRM_NAME);
+        connection.setPrimaryState(LOGIN);
+        connection.setSecondaryState(CREATE_CONFIRM_NAME.name());
 
-        Output result = interpreter.interpret(input, connection);
+        Output result = interpreter.interpret(primary, input, connection);
 
         assertEquals("[default]Please choose a password: ", result.toString());
         assertTrue(result.getSecret());
-        assertEquals(ConnectionState.CREATE_CHOOSE_PASSWORD, connection.getState());
+        assertEquals(LOGIN, connection.getPrimaryState());
+        assertEquals(CREATE_CHOOSE_PASSWORD.name(), connection.getSecondaryState());
     }
 
     @SuppressWarnings("unchecked")
@@ -507,13 +591,14 @@ public class DefaultLoginInterpreterTest {
 
         input.setInput("Not!A_PW");
         connection.setName("Dani");
-        connection.setState(ConnectionState.CREATE_CHOOSE_PASSWORD);
+        connection.setPrimaryState(LOGIN);
+        connection.setSecondaryState(CREATE_CHOOSE_PASSWORD.name());
         connection.setHttpSessionId(UUID.randomUUID().toString());
 
         when(authenticationManager.authenticate(any(Authentication.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(sessionRepository.findById(anyString())).thenReturn(session);
 
-        Output result = interpreter.interpret(input, connection);
+        Output result = interpreter.interpret(primary, input, connection);
 
         verify(userDetailsManager).createUser(any(User.class));
         verify(sessionRepository).findById(anyString());
@@ -522,7 +607,8 @@ public class DefaultLoginInterpreterTest {
 
         assertEquals("[default]Please confirm your password: ", result.toString());
         assertTrue(result.getSecret());
-        assertEquals(ConnectionState.CREATE_CONFIRM_PASSWORD, connection.getState());
+        assertEquals(LOGIN, connection.getPrimaryState());
+        assertEquals(CREATE_CONFIRM_PASSWORD.name(), connection.getSecondaryState());
 
         SecurityContext securityContext = securityContextCaptor.getValue();
         Authentication authentication = securityContext.getAuthentication();
@@ -538,19 +624,21 @@ public class DefaultLoginInterpreterTest {
 
         input.setInput("Not!A_P");
         connection.setName("Dani");
-        connection.setState(ConnectionState.CREATE_CHOOSE_PASSWORD);
+        connection.setPrimaryState(LOGIN);
+        connection.setSecondaryState(CREATE_CHOOSE_PASSWORD.name());
         connection.setHttpSessionId(UUID.randomUUID().toString());
 
         when(authenticationManager.authenticate(any(Authentication.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(sessionRepository.findById(anyString())).thenReturn(session);
 
-        Output result = interpreter.interpret(input, connection);
+        Output result = interpreter.interpret(primary, input, connection);
 
         verifyZeroInteractions(sessionRepository, session);
 
         assertEquals("[red]Passwords must be at least 8 characters.\n[default]Please choose a password: ", result.toString());
         assertTrue(result.getSecret());
-        assertEquals(ConnectionState.CREATE_CHOOSE_PASSWORD, connection.getState());
+        assertEquals(LOGIN, connection.getPrimaryState());
+        assertEquals(CREATE_CHOOSE_PASSWORD.name(), connection.getSecondaryState());
     }
 
     @Test
@@ -560,19 +648,21 @@ public class DefaultLoginInterpreterTest {
 
         input.setInput("Not!A_Real123Password");
         connection.setName("Dani");
-        connection.setState(ConnectionState.CREATE_CHOOSE_PASSWORD);
+        connection.setPrimaryState(LOGIN);
+        connection.setSecondaryState(CREATE_CHOOSE_PASSWORD.name());
         connection.setHttpSessionId(UUID.randomUUID().toString());
 
         when(authenticationManager.authenticate(any(Authentication.class))).thenThrow(new BadCredentialsException("Boom!"));
         when(sessionRepository.findById(anyString())).thenReturn(session);
 
-        Output result = interpreter.interpret(input, connection);
+        Output result = interpreter.interpret(primary, input, connection);
 
         verifyZeroInteractions(sessionRepository, session);
 
         assertEquals("[red]Oops! Something bad happened. The error has been logged.\n[default]Please choose a password: ", result.toString());
         assertTrue(result.getSecret());
-        assertEquals(ConnectionState.CREATE_CHOOSE_PASSWORD, connection.getState());
+        assertEquals(LOGIN, connection.getPrimaryState());
+        assertEquals(CREATE_CHOOSE_PASSWORD.name(), connection.getSecondaryState());
     }
 
     @SuppressWarnings("unchecked")
@@ -583,13 +673,14 @@ public class DefaultLoginInterpreterTest {
 
         input.setInput("Not!A_Real123Password");
         connection.setName("Dani");
-        connection.setState(ConnectionState.CREATE_CONFIRM_PASSWORD);
+        connection.setPrimaryState(LOGIN);
+        connection.setSecondaryState(CREATE_CONFIRM_PASSWORD.name());
         connection.setHttpSessionId(UUID.randomUUID().toString());
 
         when(authenticationManager.authenticate(any(Authentication.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(sessionRepository.findById(anyString())).thenReturn(session);
 
-        Output result = interpreter.interpret(input, connection);
+        Output result = interpreter.interpret(primary, input, connection);
 
         verify(sessionRepository).findById(anyString());
         verify(session).setAttribute(eq(SPRING_SECURITY_CONTEXT_KEY), securityContextCaptor.capture());
@@ -598,7 +689,8 @@ public class DefaultLoginInterpreterTest {
 
         assertEquals("[yellow]Welcome, Dani!\n\n[default]Dani> ", result.toString());
         assertFalse(result.getSecret());
-        assertEquals(ConnectionState.IN_GAME, connection.getState());
+        assertEquals(IN_GAME, connection.getPrimaryState());
+        assertEquals("DEFAULT", connection.getSecondaryState());
 
         SecurityContext securityContext = securityContextCaptor.getValue();
         Authentication authentication = securityContext.getAuthentication();
@@ -619,19 +711,21 @@ public class DefaultLoginInterpreterTest {
 
         input.setInput("Not!A_R");
         connection.setName("Dani");
-        connection.setState(ConnectionState.CREATE_CONFIRM_PASSWORD);
+        connection.setPrimaryState(LOGIN);
+        connection.setSecondaryState(CREATE_CONFIRM_PASSWORD.name());
         connection.setHttpSessionId(UUID.randomUUID().toString());
 
         when(authenticationManager.authenticate(any(Authentication.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(sessionRepository.findById(anyString())).thenReturn(session);
 
-        Output result = interpreter.interpret(input, connection);
+        Output result = interpreter.interpret(primary, input, connection);
 
         verifyZeroInteractions(sessionRepository, session);
 
         assertEquals("[red]Passwords must be at least 8 characters.\n[default]Please confirm your password: ", result.toString());
         assertTrue(result.getSecret());
-        assertEquals(ConnectionState.CREATE_CONFIRM_PASSWORD, connection.getState());
+        assertEquals(LOGIN, connection.getPrimaryState());
+        assertEquals(CREATE_CONFIRM_PASSWORD.name(), connection.getSecondaryState());
     }
 
     @Test
@@ -641,81 +735,21 @@ public class DefaultLoginInterpreterTest {
 
         input.setInput("Not!A_Real123Password");
         connection.setName("Dani");
-        connection.setState(ConnectionState.CREATE_CONFIRM_PASSWORD);
+        connection.setPrimaryState(LOGIN);
+        connection.setSecondaryState(CREATE_CONFIRM_PASSWORD.name());
         connection.setHttpSessionId(UUID.randomUUID().toString());
 
         when(authenticationManager.authenticate(any(Authentication.class))).thenThrow(new BadCredentialsException("Boom!"));
         when(sessionRepository.findById(anyString())).thenReturn(session);
 
-        Output result = interpreter.interpret(input, connection);
+        Output result = interpreter.interpret(primary, input, connection);
 
         verifyZeroInteractions(sessionRepository, session);
         verify(userDetailsManager).deleteUser(eq(connection.getName()));
 
         assertEquals("[red]Passwords do not match. Please try again!\n[default]Please choose a password: ", result.toString());
         assertTrue(result.getSecret());
-        assertEquals(ConnectionState.CREATE_CHOOSE_PASSWORD, connection.getState());
-    }
-
-    @Test
-    public void testInterpretLoggedIn() {
-        Input input = new Input();
-        Connection connection = new Connection();
-
-        input.setInput("Hello world!");
-        connection.setName("Dani");
-        connection.setState(ConnectionState.IN_GAME);
-
-        Creature creatureA = new Creature();
-        Connection connectionA = new Connection();
-
-        connectionA.setSessionUsername("CreatureA");
-        connectionA.setName("CreatureA");
-        connectionA.setState(ConnectionState.IN_GAME);
-        creatureA.setConnection(connectionA);
-
-        when(creatureRepository.findByConnectionIsNotNull()).thenReturn(Stream.of(creatureA));
-
-        Output result = interpreter.interpret(input, connection);
-
-        verify(simpMessagingTemplate).convertAndSendToUser(anyString(), anyString(), any(Output.class));
-
-        assertEquals("[green]You gossip 'Hello world![green]'\n\n[default]Dani> ", result.toString());
-    }
-
-    @Test
-    public void testInterpretLoggedInNoCreature() {
-        Input input = new Input();
-        Connection connection = new Connection();
-
-        input.setInput("Hello world!");
-        connection.setName("Dani");
-        connection.setState(ConnectionState.IN_GAME);
-
-        when(creatureRepository
-            .findByConnection(any(Connection.class)))
-            .thenReturn(Optional.empty());
-
-        try {
-            interpreter.interpret(input, connection);
-            fail("Required exception was not thrown.");
-        } catch (NullPointerException e) {
-            assertTrue(e.getMessage().startsWith("Unable to find Creature for Connection "));
-        }
-    }
-
-    private Map<String, String> buildPromptMap() {
-        Map<String, String> prompts = new HashMap<>();
-
-        prompts.put("askNew", "[default]Create a new character? [y/N]: ");
-        prompts.put("loginAskName", "[default]Name: ");
-        prompts.put("loginAskPassword", "[default]Password: ");
-        prompts.put("createChooseName", "[default]Please choose a name: ");
-        prompts.put("createConfirmName", "[default]Are you sure '%name%' is the name you want? [y/N]: ");
-        prompts.put("createChoosePassword", "[default]Please choose a password: ");
-        prompts.put("createConfirmPassword", "[default]Please confirm your password: ");
-        prompts.put("inGame", "[default]%name%> ");
-
-        return prompts;
+        assertEquals(LOGIN, connection.getPrimaryState());
+        assertEquals(CREATE_CHOOSE_PASSWORD.name(), connection.getSecondaryState());
     }
 }

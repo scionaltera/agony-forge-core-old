@@ -3,7 +3,7 @@ package com.agonyengine.forge.controller;
 import com.agonyengine.forge.controller.greeting.GreetingLoader;
 import com.agonyengine.forge.controller.interpret.Interpreter;
 import com.agonyengine.forge.model.Connection;
-import com.agonyengine.forge.model.ConnectionState;
+import com.agonyengine.forge.model.PrimaryConnectionState;
 import com.agonyengine.forge.repository.ConnectionRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,7 +37,7 @@ public class WebSocketController {
     public WebSocketController(
         @Named("compositeGreetingLoader") GreetingLoader greetingLoader,
         ConnectionRepository connectionRepository,
-        @Named("defaultLoginInterpreter") Interpreter interpreter) {
+        Interpreter interpreter) {
 
         greeting = greetingLoader.load();
         this.connectionRepository = connectionRepository;
@@ -56,7 +56,7 @@ public class WebSocketController {
             connection.setSessionId(headerAccessor.getSessionId());
             connection.setHttpSessionId((String) attributes.get(HTTP_SESSION_ID_ATTR_NAME));
             connection.setRemoteAddress((String) attributes.get(AGONY_REMOTE_IP_KEY));
-            connection.setState(ConnectionState.ASK_NEW);
+            connection.setPrimaryState(PrimaryConnectionState.LOGIN);
 
             Connection saved = connectionRepository.save(connection);
 

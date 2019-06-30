@@ -2,17 +2,17 @@ package com.agonyengine.forge.model;
 
 import org.junit.Test;
 
-import static com.agonyengine.forge.model.ConnectionState.ASK_NEW;
+import static com.agonyengine.forge.model.PrimaryConnectionState.LOGIN;
 import static org.junit.Assert.assertEquals;
 
-public class ConnectionStateTest {
+public class PrimaryConnectionStateTest {
     @Test
     public void testIndex() {
-        assertEquals(0, ASK_NEW.getIndex());
+        assertEquals(0, LOGIN.getIndex());
     }
 
     @Test
     public void testConverter() {
-        new ConnectionState.Converter();
+        new PrimaryConnectionState.Converter();
     }
 }
