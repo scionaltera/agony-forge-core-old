@@ -34,6 +34,8 @@ body {
 }
 
 #output-list {
+    position: absolute;
+    bottom: 10px;
     list-style: none;
     padding-left: 0;
     margin-top: 0;
