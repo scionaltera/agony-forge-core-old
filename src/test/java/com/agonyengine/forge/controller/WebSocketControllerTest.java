@@ -23,7 +23,7 @@ import java.util.UUID;
 
 import static com.agonyengine.forge.controller.ControllerConstants.AGONY_CONNECTION_ID_KEY;
 import static com.agonyengine.forge.controller.ControllerConstants.AGONY_REMOTE_IP_KEY;
-import static com.agonyengine.forge.model.ConnectionState.ASK_NEW;
+import static com.agonyengine.forge.model.PrimaryConnectionState.LOGIN;
 import static org.junit.Assert.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
@@ -89,7 +89,7 @@ public class WebSocketControllerTest {
         assertNotNull(UUID.fromString(connection.getSessionId()));
         assertNotNull(UUID.fromString(connection.getHttpSessionId()));
         assertEquals("1.2.3.4", connection.getRemoteAddress());
-        assertEquals(ASK_NEW, connection.getState());
+        assertEquals(LOGIN, connection.getPrimaryState());
     }
 
     @Test

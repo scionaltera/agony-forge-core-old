@@ -5,7 +5,8 @@ CREATE TABLE connection (
   http_session_id VARCHAR(36),
   remote_address VARCHAR(16),
   name VARCHAR(191),
-  connection_state VARCHAR(191),
+  primary_state VARCHAR(191),
+  secondary_state VARCHAR(191),
   PRIMARY KEY (id)
 ) ENGINE=InnoDB CHARACTER SET=utf8mb4, COLLATE=utf8mb4_unicode_ci;
 

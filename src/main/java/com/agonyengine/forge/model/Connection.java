@@ -26,7 +26,9 @@ public class Connection {
     private String name;
 
     @Enumerated(EnumType.STRING)
-    private ConnectionState connectionState;
+    private PrimaryConnectionState primaryState;
+
+    private String secondaryState;
 
     public UUID getId() {
         return id;
@@ -68,20 +70,28 @@ public class Connection {
         this.remoteAddress = remoteAddress;
     }
 
-    public ConnectionState getState() {
-        return connectionState;
-    }
-
-    public void setState(ConnectionState connectionState) {
-        this.connectionState = connectionState;
-    }
-
     public String getName() {
         return name;
     }
 
     public void setName(String name) {
         this.name = name;
+    }
+
+    public PrimaryConnectionState getPrimaryState() {
+        return primaryState;
+    }
+
+    public void setPrimaryState(PrimaryConnectionState primaryConnectionState) {
+        this.primaryState = primaryConnectionState;
+    }
+
+    public String getSecondaryState() {
+        return secondaryState == null ? "DEFAULT" : secondaryState;
+    }
+
+    public void setSecondaryState(String secondaryState) {
+        this.secondaryState = secondaryState;
     }
 
     @Override

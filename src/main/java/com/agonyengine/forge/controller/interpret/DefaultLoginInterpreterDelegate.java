@@ -4,13 +4,12 @@ import com.agonyengine.forge.config.LoginConfiguration;
 import com.agonyengine.forge.controller.Input;
 import com.agonyengine.forge.controller.Output;
 import com.agonyengine.forge.model.Connection;
-import com.agonyengine.forge.model.ConnectionState;
+import com.agonyengine.forge.model.DefaultLoginConnectionState;
 import com.agonyengine.forge.model.Creature;
 import com.agonyengine.forge.repository.ConnectionRepository;
 import com.agonyengine.forge.repository.CreatureRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -30,11 +29,13 @@ import javax.inject.Inject;
 import javax.transaction.Transactional;
 import java.util.Collections;
 
+import static com.agonyengine.forge.model.DefaultLoginConnectionState.*;
+import static com.agonyengine.forge.model.PrimaryConnectionState.IN_GAME;
 import static org.springframework.security.web.context.HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY;
 
 @Component
-public class DefaultLoginInterpreter extends BaseInterpreter {
-    private static final Logger LOGGER = LoggerFactory.getLogger(DefaultLoginInterpreter.class);
+public class DefaultLoginInterpreterDelegate extends BaseInterpreterDelegate implements LoginInterpreterDelegate {
+    private static final Logger LOGGER = LoggerFactory.getLogger(DefaultLoginInterpreterDelegate.class);
 
     private LoginConfiguration loginConfiguration;
     private UserDetailsManager userDetailsManager;
@@ -45,16 +46,13 @@ public class DefaultLoginInterpreter extends BaseInterpreter {
     private CreatureRepository creatureRepository;
 
     @Inject
-    public DefaultLoginInterpreter(
+    public DefaultLoginInterpreterDelegate(
         LoginConfiguration loginConfiguration,
         @SuppressWarnings("SpringJavaInjectionPointsAutowiringInspection") UserDetailsManager userDetailsManager,
         AuthenticationManager authenticationManager,
         SessionRepository sessionRepository,
         ConnectionRepository connectionRepository,
-        CreatureRepository creatureRepository,
-        SimpMessagingTemplate simpMessagingTemplate) {
-
-        super(creatureRepository, simpMessagingTemplate);
+        CreatureRepository creatureRepository) {
 
         this.loginConfiguration = loginConfiguration;
         this.userDetailsManager = userDetailsManager;
@@ -67,21 +65,22 @@ public class DefaultLoginInterpreter extends BaseInterpreter {
 
     @Transactional
     @Override
-    public Output interpret(Input input, Connection connection) {
+    public Output interpret(Interpreter primary, Input input, Connection connection) {
         Output output = new Output();
+        DefaultLoginConnectionState secondaryState = DefaultLoginConnectionState.valueOf(connection.getSecondaryState());
 
-        switch (connection.getState()) {
-            case ASK_NEW:
+        switch (secondaryState) {
+            case DEFAULT:
                 if (input.toString().equalsIgnoreCase("Y")) {
-                    connection.setState(ConnectionState.CREATE_CHOOSE_NAME);
+                    connection.setSecondaryState(CREATE_CHOOSE_NAME.name());
                 } else {
-                    connection.setState(ConnectionState.LOGIN_ASK_NAME);
+                    connection.setSecondaryState(LOGIN_ASK_NAME.name());
                 }
                 break;
             case LOGIN_ASK_NAME:
                 try {
                     connection.setName(validateName(input.toString()));
-                    connection.setState(ConnectionState.LOGIN_ASK_PASSWORD);
+                    connection.setSecondaryState(LOGIN_ASK_PASSWORD.name());
                 } catch (InvalidInputException e) {
                     output.append("[red]" + e.getMessage());
                 }
@@ -97,7 +96,7 @@ public class DefaultLoginInterpreter extends BaseInterpreter {
                 } catch (BadCredentialsException e) {
                     output.append("[red]Sorry! Please try again!");
                     LOGGER.warn("Bad password attempt for {} from {}", connection.getName(), connection.getRemoteAddress());
-                    connection.setState(ConnectionState.ASK_NEW);
+                    connection.setSecondaryState(DEFAULT.name());
                 }
                 break;
             case CREATE_CHOOSE_NAME:
@@ -108,7 +107,7 @@ public class DefaultLoginInterpreter extends BaseInterpreter {
                         output.append("[red]That name is already in use. Please try another!");
                         connection.setName(null);
                     } else {
-                        connection.setState(ConnectionState.CREATE_CONFIRM_NAME);
+                        connection.setSecondaryState(CREATE_CONFIRM_NAME.name());
                     }
                 } catch (InvalidInputException e) {
                     output.append("[red]" + e.getMessage());
@@ -116,9 +115,9 @@ public class DefaultLoginInterpreter extends BaseInterpreter {
                 break;
             case CREATE_CONFIRM_NAME:
                 if (input.toString().equalsIgnoreCase("Y")) {
-                    connection.setState(ConnectionState.CREATE_CHOOSE_PASSWORD);
+                    connection.setSecondaryState(CREATE_CHOOSE_PASSWORD.name());
                 } else {
-                    connection.setState(ConnectionState.CREATE_CHOOSE_NAME);
+                    connection.setSecondaryState(CREATE_CHOOSE_NAME.name());
                 }
                 break;
             case CREATE_CHOOSE_PASSWORD:
@@ -135,7 +134,7 @@ public class DefaultLoginInterpreter extends BaseInterpreter {
                     userDetailsManager.createUser(user);
 
                     logUserIn(connection.getName(), validatePassword(input.toString()), connection);
-                    connection.setState(ConnectionState.CREATE_CONFIRM_PASSWORD);
+                    connection.setSecondaryState(CREATE_CONFIRM_PASSWORD.name());
                 } catch (InvalidInputException e) {
                     output.append("[red]" + e.getMessage());
                 } catch (BadCredentialsException e) {
@@ -157,46 +156,34 @@ public class DefaultLoginInterpreter extends BaseInterpreter {
                 } catch (BadCredentialsException e) {
                     output.append("[red]Passwords do not match. Please try again!");
                     userDetailsManager.deleteUser(connection.getName());
-                    connection.setState(ConnectionState.CREATE_CHOOSE_PASSWORD);
+                    connection.setSecondaryState(CREATE_CHOOSE_PASSWORD.name());
                 }
-                break;
-            case IN_GAME:
-                Creature creature = creatureRepository
-                    .findByConnection(connection)
-                    .orElseThrow(() -> new NullPointerException("Unable to find Creature for Connection " + connection.getId()));
-
-                output.append("[green]You gossip '" + input.toString() + "[green]'");
-                echoToWorld(new Output("[green]" + connection.getName() + " gossips '" + input.toString() + "[green]'"), creature);
                 break;
             default:
                 output.append("[red]Oops! Something went wrong. The error has been logged.");
                 LOGGER.error("Reached default state in interpret()!");
         }
 
-        return output.append(prompt(connectionRepository.save(connection)));
+        return output.append(primary.prompt(connectionRepository.save(connection)));
     }
 
     @Transactional
     @Override
-    public Output prompt(Connection connection) {
+    public Output prompt(Interpreter interpreter, Connection connection) {
+        DefaultLoginConnectionState secondaryState = DefaultLoginConnectionState.valueOf(connection.getSecondaryState());
 
-        switch (connection.getState()) {
-            case ASK_NEW:
-                return new Output(loginConfiguration.getPrompt("askNew", connection));
+        switch (secondaryState) {
+            case DEFAULT:
             case LOGIN_ASK_NAME:
-                return new Output(loginConfiguration.getPrompt("loginAskName", connection));
-            case LOGIN_ASK_PASSWORD:
-                return new Output(loginConfiguration.getPrompt("loginAskPassword", connection)).setSecret(true);
             case CREATE_CHOOSE_NAME:
-                return new Output(loginConfiguration.getPrompt("createChooseName", connection));
             case CREATE_CONFIRM_NAME:
-                return new Output(loginConfiguration.getPrompt("createConfirmName", connection));
+                return new Output(loginConfiguration.getPrompt(secondaryState.toProperty(), connection));
+
+            case LOGIN_ASK_PASSWORD:
             case CREATE_CHOOSE_PASSWORD:
-                return new Output(loginConfiguration.getPrompt("createChoosePassword", connection)).setSecret(true);
             case CREATE_CONFIRM_PASSWORD:
-                return new Output(loginConfiguration.getPrompt("createConfirmPassword", connection)).setSecret(true);
-            case IN_GAME:
-                return new Output("", loginConfiguration.getPrompt("inGame", connection));
+                return new Output(loginConfiguration.getPrompt(secondaryState.toProperty(), connection)).setSecret(true);
+
             default:
                 LOGGER.error("Reached default state in prompt()!");
                 return new Output("[red]Oops! Something went wrong. The error has been logged.");
@@ -260,6 +247,7 @@ public class DefaultLoginInterpreter extends BaseInterpreter {
 
         creatureRepository.save(creature);
 
-        connection.setState(ConnectionState.IN_GAME);
+        connection.setPrimaryState(IN_GAME);
+        connection.setSecondaryState(null);
     }
 }
