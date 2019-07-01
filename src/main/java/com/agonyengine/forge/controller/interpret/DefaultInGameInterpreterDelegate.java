@@ -6,16 +6,11 @@ import com.agonyengine.forge.controller.Output;
 import com.agonyengine.forge.model.Connection;
 import com.agonyengine.forge.model.Creature;
 import com.agonyengine.forge.repository.CreatureRepository;
-import org.springframework.stereotype.Component;
 
-import javax.inject.Inject;
-
-@Component
 public class DefaultInGameInterpreterDelegate extends BaseInterpreterDelegate implements InGameInterpreterDelegate {
     private CreatureRepository creatureRepository;
     private LoginConfiguration loginConfiguration; // TODO need to break this configuration apart
 
-    @Inject
     public DefaultInGameInterpreterDelegate(
         CreatureRepository creatureRepository,
         LoginConfiguration loginConfiguration) {
