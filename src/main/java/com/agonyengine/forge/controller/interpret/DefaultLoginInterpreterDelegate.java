@@ -23,9 +23,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.provisioning.UserDetailsManager;
 import org.springframework.session.Session;
 import org.springframework.session.SessionRepository;
-import org.springframework.stereotype.Component;
 
-import javax.inject.Inject;
 import javax.transaction.Transactional;
 import java.util.Collections;
 
@@ -33,7 +31,6 @@ import static com.agonyengine.forge.model.DefaultLoginConnectionState.*;
 import static com.agonyengine.forge.model.PrimaryConnectionState.IN_GAME;
 import static org.springframework.security.web.context.HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY;
 
-@Component
 public class DefaultLoginInterpreterDelegate extends BaseInterpreterDelegate implements LoginInterpreterDelegate {
     private static final Logger LOGGER = LoggerFactory.getLogger(DefaultLoginInterpreterDelegate.class);
 
@@ -45,10 +42,9 @@ public class DefaultLoginInterpreterDelegate extends BaseInterpreterDelegate imp
     private ConnectionRepository connectionRepository;
     private CreatureRepository creatureRepository;
 
-    @Inject
     public DefaultLoginInterpreterDelegate(
         LoginConfiguration loginConfiguration,
-        @SuppressWarnings("SpringJavaInjectionPointsAutowiringInspection") UserDetailsManager userDetailsManager,
+        UserDetailsManager userDetailsManager,
         AuthenticationManager authenticationManager,
         SessionRepository sessionRepository,
         ConnectionRepository connectionRepository,
