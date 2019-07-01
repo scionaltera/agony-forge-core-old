@@ -24,7 +24,7 @@ phases:
     commands:
       - echo "CodeBuild Initiator is ${CODEBUILD_INITIATOR}"
       - |
-        if expr "${CODEBUILD_INITIATOR}": "codepipeline*" >/dev/null; then
+        if expr "${CODEBUILD_INITIATOR}" : "codepipeline*" >/dev/null; then
           docker push scionaltera/agony-forge-core:latest
         fi
       - |
