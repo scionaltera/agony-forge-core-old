@@ -1,5 +1,5 @@
 # The Agony Forge - Core
-![AWS CodeBuild](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiWFZBY1hvbEYweU5CdElWdmlXL2t3Vzd2R0lmOUVDN2tjQThvNWQrUFdsTy9rOEIzSit5M3JRb0JDUklTdjJiVktXMU9icjg4RGlrZmNxZXdPTFRja1RRPSIsIml2UGFyYW1ldGVyU3BlYyI6ImNCV29BOTRMVCtVTFA5YWkiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=master)
+![AWS CodeBuild](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiRkVzMmZpbkd5WWp3S0g0VXBjcUV4NW80eWJRYkFVblZpYWkwYU1yT1Jta0Jka05NUlVRZU5vK2NpZkJXS0lMdjRPbEk1K2ZMbW41STYycnZ4QzExK0pvPSIsIml2UGFyYW1ldGVyU3BlYyI6InhMRmdDWnpUR2FmWkg4Nk4iLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=master)
 
 **A modern MUD development kit.**
 
